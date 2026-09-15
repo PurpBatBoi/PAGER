@@ -1,1 +1,11 @@
-/docs
+/docs/
+/baseline/
+/scripts/
+
+# Editor and OS
+/.vscode/
+*.bak
+__pycache__/
+*.pyc
+Thumbs.db
+.DS_Store
