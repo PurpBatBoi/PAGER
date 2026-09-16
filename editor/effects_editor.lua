@@ -1340,6 +1340,9 @@ local function fx_preset_row(blk, block_index, label_w, em)
     preset_save_context = { kind = 'fx', blk = blk, entry = macro_entry, index = block_index }
     ImGui.OpenPopup(ctx, 'Save preset')
   end
+  -- same hint the Insertion Effects tab gives, so the file is discoverable
+  -- from whichever tab the preset is being saved on
+  ImGui.SetItemTooltip(ctx, 'Save a preset to ' .. efx_presets_path())
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, '-##systempresetdelete' .. blk[1]) then
     if selected and not selected.built_in then
