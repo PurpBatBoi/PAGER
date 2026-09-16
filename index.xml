@@ -4,7 +4,7 @@
     <reapack name="PAGER" type="script" desc="Roland GS editor suite for REAPER">
       <version name="0.1.0" author="PurpBatBoi" time="2026-09-15T00:00:00Z">
         <changelog><![CDATA[Initial PAGER package]]></changelog>
-        <source main="editor/effects_editor.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/effects_editor.lua</source>
+        <source main="main" file="editor/effects_editor.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/effects_editor.lua</source>
         <source file="editor/gs_sysex.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/gs_sysex.lua</source>
         <source file="editor/efx_params.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/efx_params.lua</source>
         <source file="editor/efx_types.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/efx_types.lua</source>
