@@ -1,6 +1,13 @@
 -- PAGER - Effects Editor
--- Inserts Roland GS SysEx events into the active MIDI take at the edit cursor,
--- or sends them straight to the hardware when live mode is on.
+-- Previews Roland GS SysEx on the hardware as values are edited, and writes
+-- events into the active MIDI take when an Insert action asks for it.
+--
+-- One fixed behaviour, not a mode: a settled edit, a type selection and a
+-- preset selection each preview on the hardware and touch nothing in the
+-- take; the Insert buttons write to the take and send nothing. Resets do
+-- both. The two part-assignment checkbox grids ("Parts using EFX", "Parts
+-- using EQ") are the documented exception -- they write to the take the
+-- moment they are clicked.
 --
 -- Laid out in sections, top to bottom: GS message building, the MIDI item and
 -- its event lane, the status line, shared helpers, then one section per tab,
@@ -21,27 +28,45 @@ package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua;' .. package.path
 -- Data modules sit beside this file. get_action_context returns the path the
 -- script was loaded from, so this works wherever the folder is installed.
 local SCRIPT_DIR = ({ reaper.get_action_context() })[2]:match('^(.*[/\\])') or ''
-package.path = SCRIPT_DIR .. '?.lua;' .. package.path
+package.path = SCRIPT_DIR .. '?.lua;' .. SCRIPT_DIR .. '../lib/?.lua;' .. package.path
 local ImGui = require 'imgui' '0.10'
 local GS = require 'gs_sysex'
 local json = require 'json'
 local Theme = require 'theme'
-local ctx = ImGui.CreateContext('PAGER - Effects Editor')
+local HardwareOutput = require 'hardware_output'
+local SessionState = require 'session_state'
 
--- native OS window frame instead of ImGui's drawn title bar
-ImGui.SetConfigVar(ctx, ImGui.ConfigVar_ViewportsNoDecoration, 0)
+-- The ReaImGui context. Created on the first start() rather than at load, so
+-- the module can be required by PAGER without putting a window on screen, and
+-- recreated after a close so a returning visit draws into a live context.
+--
+-- It stays a file-scope upvalue because every draw function below closes over
+-- it; threading a context argument through all of them would be a rewrite of
+-- the whole file to no visible end. start() assigns it, the close path clears
+-- it, and nothing between the two may assume it survives a visit.
+local ctx
 
-local FONT_SIZE = 15
+local FONT_SIZE = Theme.FONT_SIZE
 local WIN_H = 300 -- default height; the width is measured by window_w
 local TAB_PAD = 18 -- inset for tab contents
 -- User settings, exposed on the Settings tab.
--- tick_gap: back-to-back events are too fast for the hardware to process.
+-- midi_tick_gap: PPQ spacing between the events a macro writes into the MIDI
+-- take. Purely a project-timeline measure -- it has nothing to do with the
+-- fixed 20 ms wall-clock interval the hardware preview queue paces itself by,
+-- which is why it is not simply called tick_gap any more.
 -- label_events: write a readable text event alongside each insert.
--- live: send directly to the track's MIDI hardware output instead of the item.
-local cfg = { tick_gap = 2, label_events = true, live = false }
+local cfg = { midi_tick_gap = 2, label_events = true }
 local first_frame = true
-local font = ImGui.CreateFont('sans-serif')
-ImGui.Attach(ctx, font)
+
+-- Per-project session state: the values and selections a reopened editor
+-- restores. Owned by session_state.lua; this file only decides what goes in
+-- and validates what comes back.
+local session = SessionState.new({ reaper = reaper })
+local SESSION_TOOL = 'effects_editor'
+-- The project this window is currently bound to. A change means the user
+-- switched REAPER project tabs, which saves the old state and passively
+-- loads the new one; see check_project below.
+local bound_project
 
 local dt1 = GS.dt1
 local is_dt1_at = GS.is_dt1_at
@@ -145,19 +170,11 @@ local function put_label(take, ppq, text)
   reaper.MIDI_InsertTextSysexEvt(take, false, false, ppq, 1, text)
 end
 
--- Direct send needs framing that REAPER supplies for item events.
-local function send_live(payload, take)
-  local track = reaper.GetMediaItemTake_Track(take)
-  local hwout = reaper.GetMediaTrackInfo_Value(track, 'I_MIDIHWOUT')
-  if hwout < 0 then
-    return false, 'No MIDI hardware output on this track.'
-  end
-  local dev = hwout >> 5
-  reaper.SendMIDIMessageToHardware(dev, string.char(0xF0) .. payload .. string.char(0xF7))
-  return true
-end
+-- The hardware preview queue. Owns routing, framing, the 20 ms pacing and
+-- the ordering rules; see hardware_output.lua. Nothing here sends directly.
+local hw = HardwareOutput.new({ reaper = reaper })
 
-local NO_TAKE = 'No MIDI take: open a MIDI editor or select a MIDI item.'
+local NO_TAKE = HardwareOutput.NO_TAKE
 
 -- status line ---------------------------------------------------------------
 
@@ -168,33 +185,46 @@ local function set_status(msg)
   status, status_time = msg, reaper.time_precise()
 end
 
--- Live echo for a single parameter row, on release of the widget.
--- In item mode this does nothing: parameter edits stay in memory until the
--- tab's explicit Insert/Apply action, which is what writes the run. In live
--- mode there is no such action to wait for -- the hardware is the only
--- destination -- so the value goes out as soon as the drag ends. Called by
--- every parameter row, so no tab can be left out of it.
-local function live_echo(addr_mid, addr, value, name)
-  if not cfg.live then return end
+-- Preview one settled parameter edit on the hardware. The take is needed only
+-- to find the track carrying the hardware output; nothing is written to it.
+--
+-- `addr` keys the queue's coalescing: two edits to the same address before
+-- the queue drains collapse to the newest value, so dragging a slider back
+-- and forth cannot pile up stale messages behind the current one.
+-- The payload-agnostic half, for rows whose payload is not a plain
+-- { 0x40, mid, addr, value } -- the Master rows build theirs through
+-- master_volume / master_tune, which carry their own addresses.
+local function preview_payload(payload, name, addr_key)
   local take = get_take()
-  -- send_live needs a take only to find the track carrying the hardware
-  -- output, so the item still has to exist even though nothing is written.
   if not take then set_status(NO_TAKE) return end
-  local ok, err = send_live(dt1({ 0x40, addr_mid, addr, value }), take)
+  local ok, err = hw:preview_param(payload, take, addr_key)
   set_status(ok and ('Sent ' .. name .. ' to hardware.') or err)
 end
 
--- Every write path starts the same way: there must be a take, and in live mode
--- the payload goes straight to the hardware instead of into the item. Returns
--- the take to write into, or nil plus the (ok, message) pair to return as-is.
-local function begin_write(payload, name)
+local function live_echo(addr_mid, addr, value, name)
+  preview_payload(dt1({ 0x40, addr_mid, addr, value }), name,
+                  ('%02X:%02X'):format(addr_mid, addr))
+end
+
+-- Preview a complete ordered run -- an effect type selection or a preset --
+-- as one batch. A newer batch replaces whatever is left of an older one.
+-- `events` is a list of ready payload strings, in the order they must go out.
+local function preview_batch(events, name)
+  local take = get_take()
+  if not take then set_status(NO_TAKE) return false, NO_TAKE end
+  local ok, err = hw:preview_batch(events, take)
+  local msg = ok and ('Sent %s (%d events) to hardware.'):format(name, #events) or err
+  set_status(msg)
+  return ok, msg
+end
+
+-- Every MIDI-take write path starts the same way: there must be a take.
+-- Insert actions never send -- the preview the user already heard is what
+-- made them press the button. Returns the take to write into, or nil plus
+-- the (ok, message) pair to return as-is.
+local function begin_write()
   local take = get_take()
   if not take then return nil, false, NO_TAKE end
-  if cfg.live then
-    local ok, err = send_live(payload, take)
-    if not ok then return nil, false, err end
-    return nil, true, 'Sent ' .. name .. ' to hardware.'
-  end
   return take
 end
 
@@ -203,7 +233,7 @@ local function cursor_ppq(take)
 end
 
 local function insert_sysex(payload, name)
-  local take, ok, msg = begin_write(payload, name)
+  local take, ok, msg = begin_write()
   if not take then return ok, msg end
 
   local ppq = cursor_ppq(take)
@@ -219,6 +249,30 @@ local function insert_sysex(payload, name)
   end
   reaper.Undo_EndBlock('Insert ' .. name, -1)
   return true, 'Inserted ' .. name .. ' at cursor.'
+end
+
+-- A reset does both halves: it cancels everything pending and queues itself
+-- for the hardware, and it writes itself into the take. The two are
+-- independent on purpose -- a track with no hardware output still gets the
+-- reset event written, and the status says so rather than reporting a
+-- failure that did not stop the insertion.
+local function apply_reset(r)
+  local payload = r.build()
+  local take = get_take()
+
+  local queued, hw_err = false, nil
+  if take then
+    queued, hw_err = hw:reset(payload, take)
+  else
+    -- No take is not a routing failure: there is nothing to write into and
+    -- no track to resolve a device from, so both halves fail together.
+    hw:cancel()
+  end
+
+  local ok, msg = insert_sysex(payload, r.name)
+  if not ok then return msg end
+  if queued then return msg .. ' Sent to hardware.' end
+  return msg .. ' ' .. (hw_err or 'Not sent to hardware.')
 end
 
 -- shared helpers ------------------------------------------------------------
@@ -305,6 +359,32 @@ local function master_fader(m, label_w, slider_w)
   return slider_settled(m)
 end
 
+-- Write every master value as its own event, one per midi_tick_gap tick from
+-- the playhead. The four masters are independent parameters at unrelated
+-- addresses rather than a block run, but they still cannot share a tick --
+-- the hardware drops the second of two SysEx messages sent at the same
+-- instant -- so they are spaced like any other multi-event insert.
+--
+-- Insert writes and does not send: the values were previewed as they were
+-- edited, so sending them again here would duplicate what was already heard.
+local function insert_masters()
+  local name = 'Master settings'
+  local take = get_take()
+  if not take then return false, NO_TAKE end
+
+  local base = cursor_ppq(take)
+  reaper.Undo_BeginBlock()
+  for i, m in ipairs(MASTERS) do
+    local ppq = base + (i - 1) * cfg.midi_tick_gap
+    delete_sysex_at(take, ppq)
+    reaper.MIDI_InsertTextSysexEvt(take, false, false, ppq, SYSEX, m.build(m.value))
+  end
+  put_label(take, base, name)
+  reaper.MIDI_Sort(take)
+  reaper.Undo_EndBlock('Insert ' .. name, -1)
+  return true, ('Inserted %s (%d events) at cursor.'):format(name, #MASTERS)
+end
+
 local function tab_master()
   local em = ImGui.GetFontSize(ctx)
   local label_w = ImGui.CalcTextSize(ctx, 'Key-Shift') + em
@@ -312,17 +392,25 @@ local function tab_master()
 
   for _, m in ipairs(MASTERS) do
     if master_fader(m, label_w, slider_w) then
-      local _, msg = insert_sysex(m.build(m.value), 'Master ' .. m.name)
-      set_status(msg)
+      -- A settled edit previews and leaves the take alone; Insert below is
+      -- what commits the values. The master name keys the coalescing, since
+      -- these payloads carry their own addresses rather than a shared one.
+      preview_payload(m.build(m.value), 'Master ' .. m.name, 'master:' .. m.name)
     end
   end
+
+  ImGui.Dummy(ctx, 0, em * 0.5)
+  if ImGui.Button(ctx, 'Insert##masterinsert') then
+    local _, msg = insert_masters()
+    set_status(msg)
+  end
+  ImGui.SetItemTooltip(ctx, 'Write all four master values at the playhead')
 
   ImGui.Dummy(ctx, 0, em * 0.5)
   for i, r in ipairs(RESETS) do
     if i > 1 then ImGui.SameLine(ctx) end
     if ImGui.Button(ctx, r.name) then
-      local _, msg = insert_sysex(r.build(), r.name)
-      set_status(msg)
+      set_status(apply_reset(r))
     end
   end
 end
@@ -595,45 +683,190 @@ end
 -- run rather than being placed on one tick and replacing each other.
 local put_at
 local relabel_run
-local function insert_efx_preset(p)
+
+-- One preset's events in write order: this type's parameters first, then the
+-- shared Insertion Sub values. Both the hardware preview and the MIDI-take
+-- insertion consume this single walk, so the two cannot drift out of order
+-- or disagree on how many events a preset is. Returns nil plus an error on a
+-- malformed preset.
+local function efx_preset_events(p)
   local ps = EFX_PARAMS[efx_type] or {}
   if #p.vals ~= #ps or #p.sub ~= #EFX_SUB then
-    return false, ('Preset %q has the wrong parameter count.'):format(p.name)
+    return nil, ('Preset %q has the wrong parameter count.'):format(p.name)
   end
   local events = {}
   for i, e in ipairs(ps) do
     local v = tonumber(p.vals[i])
-    if not v then return false, ('Preset %q has an invalid parameter value.'):format(p.name) end
+    if not v then return nil, ('Preset %q has an invalid parameter value.'):format(p.name) end
     v = clamp(math.floor(v), e.min, e.max)
     events[#events + 1] = { addr = { 0x40, 0x03, e.addr }, value = v }
   end
   for i, e in ipairs(EFX_SUB) do
     local v = tonumber(p.sub[i])
-    if not v then return false, ('Preset %q has an invalid sub value.'):format(p.name) end
+    if not v then return nil, ('Preset %q has an invalid sub value.'):format(p.name) end
     v = clamp(math.floor(v), e.min, e.max)
     events[#events + 1] = { addr = { 0x40, 0x03, e.addr }, value = v }
   end
+  return events
+end
+
+-- The payload of one { addr, value } event, as both paths need it.
+local function event_payload(event)
+  return dt1({ event.addr[1], event.addr[2], event.addr[3], event.value })
+end
+
+-- Preview a complete insertion-effect state: the type-selection message, this
+-- type's parameters and the shared Insertion Sub values, as one batch. This
+-- is what a type selection and a preset selection both send.
+local function preview_efx_state(events, name)
+  local e = EFX_TYPES[efx_type]
+  local payloads = { dt1({ 0x40, 0x03, 0x00, e[2], e[3] }) }
+  for _, event in ipairs(events) do
+    payloads[#payloads + 1] = event_payload(event)
+  end
+  return preview_batch(payloads, name)
+end
+
+-- The current on-screen insertion-effect state as ordered events: this
+-- type's parameters, then the shared sub values. Selecting a type previews
+-- through this, so what goes out is what the panes show.
+local function efx_current_events()
+  local events = {}
+  for _, e in ipairs(EFX_PARAMS[efx_type] or {}) do
+    events[#events + 1] = { addr = { 0x40, 0x03, e.addr }, value = e.value }
+  end
+  for _, e in ipairs(EFX_SUB) do
+    events[#events + 1] = { addr = { 0x40, 0x03, e.addr }, value = e.value }
+  end
+  return events
+end
+
+-- Preview whatever the Insertion Effects tab currently shows.
+local function preview_efx_current(name)
+  return preview_efx_state(efx_current_events(), name)
+end
+
+local function insert_efx_preset(p)
+  local events, build_err = efx_preset_events(p)
+  if not events then return false, build_err end
 
   local take = get_take()
   if not take then return false, NO_TAKE end
   local name = ('EFX: %s | %s (%d parameters)'):format(EFX_TYPES[efx_type][1], p.name, #events)
-  if cfg.live then
-    for _, event in ipairs(events) do
-      local ok, err = send_live(dt1({ event.addr[1], event.addr[2], event.addr[3], event.value }), take)
-      if not ok then return false, err end
-    end
-    return true, 'Sent ' .. name .. ' to hardware.'
-  end
 
+  -- A complete playable run: the effect type first, then the parameters and
+  -- the shared sub values. Without the type event the run would configure
+  -- whichever effect happened to be loaded, so the type leads it here even
+  -- though the type also has its own separate Insert button.
+  local type_entry = EFX_TYPES[efx_type]
   local base = cursor_ppq(take)
   reaper.Undo_BeginBlock()
+  put_at(take, base, { 0x40, 0x03, 0x00 },
+         { type_entry[2], type_entry[3] })
   for i, event in ipairs(events) do
-    put_at(take, base + (i - 1) * cfg.tick_gap, event.addr, event.value)
+    put_at(take, base + i * cfg.midi_tick_gap, event.addr, event.value)
   end
-  put_label(take, base, name)
+  relabel_run(take, base, name)
   reaper.MIDI_Sort(take)
   reaper.Undo_EndBlock('Insert ' .. name, -1)
   return true, 'Inserted ' .. name .. ' at cursor.'
+end
+
+-- Is there already an EFX run at the cursor? All insertion parameters share
+-- one address space (40 03), with no macro register to key off of the way
+-- the system-effect blocks do, so this scans for the first parameter's own
+-- address instead -- same fallback run_base uses for EQ.
+local function efx_run_base(take, ps)
+  local ppq = cursor_ppq(take)
+  -- +1 for the type event a complete run now starts with.
+  local span = (#ps + #EFX_SUB + 1) * cfg.midi_tick_gap
+  -- The type event is what a complete run begins with, so look for it first:
+  -- finding it gives the true run base directly. Older runs written without
+  -- one still resolve through the parameter scan below.
+  local type_idx, type_pos = find_dt1(take, ppq, { 0x40, 0x03, 0x00 }, span)
+  if type_idx then return type_pos end
+  for i, e in ipairs(ps) do
+    local idx, pos = find_dt1(take, ppq, { 0x40, 0x03, e.addr }, span)
+    -- Parameter i sits at slot i, one tick past the type event that leads
+    -- the run, so the base is that many gaps earlier.
+    if idx then return pos - i * cfg.midi_tick_gap end
+  end
+  return nil
+end
+
+-- Which insertion parameters differ from a preset's baseline values, as
+-- { addr, slot, value } in write order: ps first (slot 0..#ps-1), then
+-- EFX_SUB (slot #ps..#ps+#EFX_SUB-1) so both share one run's slot numbering.
+-- Pure and REAPER-free on purpose -- see editor/test_efx_changes.lua, which
+-- lifts this function to check it against real efx_params.lua data.
+-- Returns nil plus an error string on a malformed preset.
+local function efx_changed_params(p, ps)
+  local changed = {}
+  for i, e in ipairs(ps) do
+    local baseline = tonumber(p.vals[i])
+    if baseline == nil then
+      return nil, ('Preset %q has an invalid parameter value.'):format(p.name)
+    end
+    if e.value ~= clamp(math.floor(baseline), e.min, e.max) then
+      changed[#changed + 1] = { addr = { 0x40, 0x03, e.addr }, slot = i - 1, value = e.value }
+    end
+  end
+  for i, e in ipairs(EFX_SUB) do
+    local baseline = tonumber(p.sub[i])
+    if baseline == nil then
+      return nil, ('Preset %q has an invalid sub value.'):format(p.name)
+    end
+    if e.value ~= clamp(math.floor(baseline), e.min, e.max) then
+      changed[#changed + 1] = { addr = { 0x40, 0x03, e.addr }, slot = #ps + i - 1, value = e.value }
+    end
+  end
+  return changed
+end
+
+-- Write only parameters that differ from the selected preset -- mirrors
+-- insert_system_preset_changes. When a run already exists at the cursor,
+-- each changed parameter keeps its normal slot in that run; otherwise the
+-- changed values are packed into a new run starting at the cursor.
+local function insert_efx_preset_changes(p)
+  local ps = EFX_PARAMS[efx_type] or {}
+  if #p.vals ~= #ps or #p.sub ~= #EFX_SUB then
+    return false, ('Preset %q has the wrong parameter count.'):format(p.name)
+  end
+
+  local changed, diff_err = efx_changed_params(p, ps)
+  if not changed then return false, diff_err end
+
+  if #changed == 0 then
+    return true, 'No changed parameters to insert.'
+  end
+
+  local take = get_take()
+  if not take then return false, NO_TAKE end
+
+  local name = ('EFX: %s | %s (changed parameters)'):format(EFX_TYPES[efx_type][1], p.name)
+  -- This action only ever writes parameters the user actually edited. It
+  -- never expands into a complete run: writing values that were not touched
+  -- is what "only changes" exists to avoid.
+  --
+  -- On an existing run each parameter keeps its own slot, one tick past the
+  -- type event that leads the run. With no run at the cursor there are no
+  -- slots to keep, so the changed values are packed together from the cursor.
+  local existing_base = efx_run_base(take, ps)
+  local base = existing_base or cursor_ppq(take)
+
+  reaper.Undo_BeginBlock()
+  for changed_index, item in ipairs(changed) do
+    local offset = existing_base and (item.slot + 1) or (changed_index - 1)
+    put_at(take, base + offset * cfg.midi_tick_gap, item.addr, item.value)
+  end
+  relabel_run(take, base, name)
+  reaper.MIDI_Sort(take)
+  reaper.Undo_EndBlock('Insert ' .. name, -1)
+
+  if existing_base then
+    return true, ('Updated %d changed parameter(s) in the run at the cursor.'):format(#changed)
+  end
+  return true, ('Inserted %d changed parameter(s) at cursor (no run to update).'):format(#changed)
 end
 
 efx_presets = efx_presets_read()
@@ -731,12 +964,14 @@ local function efx_param_row(e, label_w, em, show_range)
   end
 end
 
--- Rows the Parameters panel sizes for. The table runs from 3 to 20 rows with
--- a median of 11; 14 of the 64 effects exceed this and scroll, which beats
--- resizing the window on every effect change or leaving it tall and empty.
-local EFX_FIT_ROWS = 18
+-- Rows the Parameters pane shows before it scrolls. The table runs from 3 to
+-- 20 rows with a median of 11, so ten complete rows keeps the window short
+-- while covering most effects outright; the rest scroll inside the pane.
+-- GTR Multi 1 (11 parameters) is the acceptance case: ten rows visible, the
+-- eleventh reachable by scrolling.
+local EFX_FIT_ROWS = 10
 
-local win_w_cache, efx_win_h, fx_win_h
+local win_w_cache, efx_win_h
 
 -- Every tab uses this one width, so the window never changes width once it is
 -- open. Insertion Effects is what sets it: two panels, each holding the label
@@ -767,18 +1002,33 @@ local function window_w(em)
   return win_w_cache
 end
 
--- Height the Insertion Effects tab asks for: EFX_FIT_ROWS rows, plus the
--- panel header, the type selector above the panels, the tab inset and the
--- footer. Heights stay per-tab; only the width is shared.
+-- Height the Insertion Effects tab asks for, built from the same ten-row
+-- pane measurement the panes themselves use, plus the chrome around them:
+-- the heading row above the panes, the type/preset row, the part-assignment
+-- row and its label, the outer tab bar, the tab inset and the footer.
+-- Heights stay per-tab; only the width is shared.
 local function efx_window_h(em)
   if efx_win_h then return efx_win_h end
   local row = ImGui.GetFrameHeightWithSpacing(ctx)
-  local header = ImGui.GetTextLineHeightWithSpacing(ctx)
-                 + ImGui.GetFrameHeightWithSpacing(ctx)
-  efx_win_h = EFX_FIT_ROWS * row + header
-             + ImGui.GetFrameHeightWithSpacing(ctx) * 4 + em
-             + ImGui.GetFrameHeightWithSpacing(ctx) * 2
-             + em * 0.5 + TAB_PAD * 2 + em * 4
+  local text_row = ImGui.GetTextLineHeightWithSpacing(ctx)
+  local pad_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_FramePadding))
+
+  -- the panes, exactly as tab_insertion sizes them
+  local panes = EFX_FIT_ROWS * row + pad_y * 2
+
+  -- Everything tab_insertion draws above the panes, counted one for one:
+  --   the type / Insert / preset / buttons row   (one frame row, all SameLine)
+  --   the 'Parts using EFX:' label               (one text row)
+  --   the 16 part checkboxes                     (one frame row)
+  --   the em*0.5 spacer under them
+  --   the 'Parameters' / 'Insertion Sub' heading (one text row)
+  local above = row * 2 + text_row * 2 + em * 0.5
+
+  -- and the chrome outside the tab body: the outer tab bar, the tab inset
+  -- top and bottom, and the footer's separator plus its row.
+  local outside = row * 2 + TAB_PAD * 2
+
+  efx_win_h = panes + above + outside
   return efx_win_h
 end
 
@@ -810,17 +1060,28 @@ local function tab_insertion()
   ImGui.Text(ctx, 'EFX Type:')
   -- '##' hides the built-in label, which BeginCombo draws to the right
   ImGui.SetNextItemWidth(ctx, em * 12)
+  -- Selecting a type previews the complete state it implies -- the type
+  -- message, this type's current parameters and the shared sub values --
+  -- rather than the bare type-selection message, which would leave the
+  -- hardware on whatever parameters the previous effect had left behind.
   if ImGui.BeginCombo(ctx, '##efxtype', EFX_TYPES[efx_type][1]) then
     for i, e in ipairs(EFX_TYPES) do
       if ImGui.Selectable(ctx, ('%02d: %s'):format(i - 1, e[1]), i == efx_type) then
-        efx_type = i
+        if i ~= efx_type then
+          efx_type = i
+          preview_efx_current('EFX: ' .. e[1])
+        end
       end
     end
     ImGui.EndCombo(ctx)
   end
   local wheel = mouse_wheel_step()
   if wheel ~= 0 then
-    efx_type = clamp(efx_type + wheel, 1, #EFX_TYPES)
+    local stepped = clamp(efx_type + wheel, 1, #EFX_TYPES)
+    if stepped ~= efx_type then
+      efx_type = stepped
+      preview_efx_current('EFX: ' .. EFX_TYPES[efx_type][1])
+    end
   end
 
   ImGui.SameLine(ctx)
@@ -843,7 +1104,9 @@ local function tab_insertion()
         local ok, msg = efx_preset_apply(p)
         if ok then
           efx_preset_sel[efx_type] = p
-          set_status(("Loaded '%s' (values only; insert to send)."):format(p.name))
+          -- The preset's values are now in the entries, so previewing the
+          -- current state sends exactly what the panes show.
+          preview_efx_current(("EFX: %s | %s"):format(EFX_TYPES[efx_type][1], p.name))
         else
           set_status(msg)
         end
@@ -860,7 +1123,7 @@ local function tab_insertion()
     local ok, msg = efx_preset_apply(p)
     if ok then
       efx_preset_sel[efx_type] = p
-      set_status(("Loaded '%s' (values only; insert to send)."):format(p.name))
+      preview_efx_current(("EFX: %s | %s"):format(EFX_TYPES[efx_type][1], p.name))
     else set_status(msg) end
   end
   ImGui.SameLine(ctx)
@@ -885,6 +1148,11 @@ local function tab_insertion()
     set_status(msg)
   end
   ImGui.SetItemTooltip(ctx, 'Insert the selected preset at the playhead')
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, 'Insert only changes##efxpresetchanges') then
+    local _, msg = insert_efx_preset_changes(selected)
+    set_status(msg)
+  end
 
   draw_preset_popup(em)
 
@@ -903,14 +1171,50 @@ local function tab_insertion()
 
   -- Leave TAB_PAD at the right and bottom too: the tab inset only moves the
   -- starting cursor, so a child of size 0 would otherwise fill to the edge.
-  local avail_w, avail_h = ImGui.GetContentRegionAvail(ctx)
+  local avail_w = ImGui.GetContentRegionAvail(ctx)
   local col_w = (avail_w - TAB_PAD - em) / 2
-  local col_h = avail_h - TAB_PAD
+  -- Ten complete rows plus the child's own vertical frame padding is what
+  -- the window is sized for. GetStyleVar returns x then y, so the second
+  -- value is the one that matters here.
+  local pad_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_FramePadding))
+  local col_h = EFX_FIT_ROWS * ImGui.GetFrameHeightWithSpacing(ctx) + pad_y * 2
+
+  -- ...but never taller than the room actually left on this tab. The window
+  -- height is an estimate of the chrome above and below; if it is off by a
+  -- few pixels, or the user has resized the window shorter, the panes must
+  -- give way rather than push the tab past its bottom edge and put a
+  -- scrollbar on the whole window. Only the rows inside a pane may scroll.
+  --
+  -- The floor matters: a tab change applies its new window height on the
+  -- NEXT frame, so for one frame this runs against the old (possibly much
+  -- shorter) window and the room left here can fall to a few pixels or go
+  -- negative. A child that small is not worth drawing, and sizing one from
+  -- a negative number is how the frame ends up unbalanced -- keep at least
+  -- three rows and let that one frame overflow instead.
+  local row_h = ImGui.GetFrameHeightWithSpacing(ctx)
+  local room = select(2, ImGui.GetContentRegionAvail(ctx))
+                 - ImGui.GetTextLineHeightWithSpacing(ctx)  -- the heading row
+                 - TAB_PAD
+  if col_h > room then col_h = math.max(room, row_h * 3) end
+
+  -- The two headings sit above the framed panes rather than inside them, so
+  -- they stay visible while only the rows scroll. Drawn as one row here to
+  -- keep them aligned with the columns below.
+  local heading_x = ImGui.GetCursorPosX(ctx)
+  ImGui.Text(ctx, 'Parameters')
+  ImGui.SameLine(ctx, heading_x + col_w + em)
+  ImGui.Text(ctx, 'Insertion Sub')
 
   -- left: per-effect parameters (40 03 03-16), different for every type
+  --
+  -- EndChild is called ONLY when BeginChild returned true. Since ReaImGui
+  -- 0.9 the binding ends the child itself when it returns false (window.cpp:
+  -- `if(!rv) ImGui::EndChild();`), so an unconditional EndChild pops a
+  -- second level -- the enclosing tab bar's -- and the frame dies at the
+  -- next End with "Missing EndTabBar()". A child returns false when it is
+  -- collapsed or fully clipped, which is exactly what fast tab switching
+  -- produces, so the wrong pattern survives ordinary use and fails under it.
   if ImGui.BeginChild(ctx, 'efx_params', col_w, col_h, ImGui.ChildFlags_Borders) then
-    ImGui.Text(ctx, 'Parameters')
-    ImGui.Separator(ctx)
     local ps = EFX_PARAMS[efx_type]
     if not ps or #ps == 0 then
       ImGui.TextDisabled(ctx, 'This effect has no parameters.')
@@ -923,21 +1227,21 @@ local function tab_insertion()
         efx_param_row(e, label_w, em, true)
       end
     end
+    ImGui.EndChild(ctx)
   end
-  ImGui.EndChild(ctx)
 
   ImGui.SameLine(ctx)
 
-  -- right: the sub parameters, shared by every effect type
+  -- right: the sub parameters, shared by every effect type. Same height as
+  -- the Parameters pane so the two columns line up, even though its eight
+  -- rows never need to scroll.
   if ImGui.BeginChild(ctx, 'efx_sub', col_w, col_h, ImGui.ChildFlags_Borders) then
-    ImGui.Text(ctx, 'Insertion Sub')
-    ImGui.Separator(ctx)
     local label_w = ImGui.CalcTextSize(ctx, 'Send Level To Reverb') + em
     for _, e in ipairs(EFX_SUB) do
       efx_param_row(e, label_w, em, false)
     end
+    ImGui.EndChild(ctx)
   end
-  ImGui.EndChild(ctx)
 end
 
 
@@ -1008,7 +1312,7 @@ end
 -- fall back to scanning for the run's first real parameter instead.
 local function run_base(take, blk, entry)
   local ppq = cursor_ppq(take)
-  local span = (#blk[2] + 1) * cfg.tick_gap
+  local span = (#blk[2] + 1) * cfg.midi_tick_gap
   if entry.addr then
     local idx, pos = find_dt1(take, ppq, { 0x40, blk.addr_mid, entry.addr }, span)
     return idx and pos
@@ -1022,10 +1326,18 @@ local function run_base(take, blk, entry)
   return nil
 end
 
--- Write or rewrite one event of a run at an exact tick.
+-- Write or rewrite one event of a run at an exact tick. `value` is normally
+-- one data byte; the EFX type message carries two (MSB and LSB), so a table
+-- of bytes is accepted there and appended in order.
 put_at = function(take, ppq, addr, value)
   local idx = find_dt1(take, ppq, addr, 0)
-  local payload = dt1({ addr[1], addr[2], addr[3], value })
+  local body = { addr[1], addr[2], addr[3] }
+  if type(value) == 'table' then
+    for _, b in ipairs(value) do body[#body + 1] = b end
+  else
+    body[#body + 1] = value
+  end
+  local payload = dt1(body)
   if idx then
     reaper.MIDI_SetTextSysexEvt(take, idx, nil, nil, ppq, -1, payload, false)
   else
@@ -1048,20 +1360,6 @@ local function insert_system_preset(blk, entry, p)
   end
   local macro_value = clamp(entry.value, 0, #entry.macros - 1)
 
-  if cfg.live then
-    if entry.addr then
-      local macro_ok, macro_err = send_live(dt1({ 0x40, blk.addr_mid, entry.addr, macro_value }), take)
-      if not macro_ok then return false, macro_err end
-    end
-    for _, e in ipairs(blk[2]) do
-      if not e.macros then
-        local sent, err = send_live(dt1({ 0x40, blk.addr_mid, e.addr, e.value }), take)
-        if not sent then return false, err end
-      end
-    end
-    return true, 'Sent ' .. name .. ' (' .. count .. ' events) to hardware.'
-  end
-
   local base = cursor_ppq(take)
   reaper.Undo_BeginBlock()
   local tick = 0
@@ -1071,7 +1369,7 @@ local function insert_system_preset(blk, entry, p)
   end
   for _, e in ipairs(blk[2]) do
     if not e.macros then
-      put_at(take, base + tick * cfg.tick_gap, { 0x40, blk.addr_mid, e.addr }, e.value)
+      put_at(take, base + tick * cfg.midi_tick_gap, { 0x40, blk.addr_mid, e.addr }, e.value)
       tick = tick + 1
     end
   end
@@ -1115,29 +1413,27 @@ local function insert_system_preset_changes(blk, entry, p)
   end
 
   local name = ('%s: changed parameters'):format(blk[1])
-  if cfg.live then
-    for _, item in ipairs(changed) do
-      local sent, err = send_live(dt1({ 0x40, blk.addr_mid, item.entry.addr, item.value }), take)
-      if not sent then return false, err end
-    end
-    return true, ('Sent %s (%d events) to hardware.'):format(name, #changed)
-  end
-
+  -- Only parameters the user edited, never a complete run -- same rule as
+  -- the insertion-effect path. An existing run keeps each parameter's normal
+  -- macro-first slot; with no run at the cursor the changed values are
+  -- packed together from the cursor instead.
   local existing_base = run_base(take, blk, entry)
   local base = existing_base or cursor_ppq(take)
+
   reaper.Undo_BeginBlock()
   for changed_index, item in ipairs(changed) do
-    -- Existing runs retain the normal macro-first parameter slots. A new
-    -- parameter-only insertion starts at the playhead and packs only the
-    -- changed values.
     local offset = existing_base and item.slot or (changed_index - 1)
-    local ppq = base + offset * cfg.tick_gap
-    put_at(take, ppq, { 0x40, blk.addr_mid, item.entry.addr }, item.value)
+    put_at(take, base + offset * cfg.midi_tick_gap,
+           { 0x40, blk.addr_mid, item.entry.addr }, item.value)
   end
   relabel_run(take, base, name)
   reaper.MIDI_Sort(take)
   reaper.Undo_EndBlock('Insert ' .. name, -1)
-  return true, ('Inserted %s (%d events) at cursor.'):format(name, #changed)
+
+  if existing_base then
+    return true, ('Updated %d changed parameter(s) in the run at the cursor.'):format(#changed)
+  end
+  return true, ('Inserted %d changed parameter(s) at cursor (no run to update).'):format(#changed)
 end
 
 -- Where the 16 part switches already sit near the cursor, as a tick range.
@@ -1161,21 +1457,25 @@ end
 -- so the 16 switches gather into one run rather than colliding on a tick.
 -- addr_fn picks the switch; parts holds the 16 checkbox booleans; word names
 -- it in the event label ('EFX' or 'EQ').
+--
+-- These two checkbox grids are the deliberate exception to "Insert writes,
+-- everything else previews": clicking one writes to the MIDI take
+-- immediately, which is the behaviour they have always had.
 local function apply_part_switch(part, addr_fn, parts, word)
   local addr = addr_fn(part)
   local value = parts[part] and 1 or 0
   local name = ('Part %d %s %s'):format(part, word, parts[part] and 'ON' or 'OFF')
 
-  local take, ok, msg = begin_write(dt1({ addr[1], addr[2], addr[3], value }), name)
+  local take, ok, msg = begin_write()
   if not take then return ok, msg end
 
   local cursor = cursor_ppq(take)
-  local span = 16 * cfg.tick_gap
+  local span = 16 * cfg.midi_tick_gap
   local existing, at = find_dt1(take, cursor, addr, span)
   local ppq = at
   if not existing then
     local first, last = part_run_extent(take, cursor, span, addr_fn)
-    ppq = last and last + cfg.tick_gap or first or cursor
+    ppq = last and last + cfg.midi_tick_gap or first or cursor
   end
 
   reaper.Undo_BeginBlock()
@@ -1232,41 +1532,13 @@ local function each_preset_event(blk, entry, choice, emit)
   return n
 end
 
-local function apply_macro(blk, entry, choice)
-  local preset_name = entry.macros[choice][1]
-  local label = ('%s: %s'):format(blk[1], preset_name)
-
-  local take = get_take()
-  if not take then return false, NO_TAKE end
-
-  if cfg.live then
-    local n, err = each_preset_event(blk, entry, choice, function(_, addr, value)
-      return send_live(dt1({ addr[1], addr[2], addr[3], value }), take)
-    end)
-    if not n then return false, err end
-    return true, ('Sent %s (%d events) to hardware.'):format(preset_name, n)
-  end
-
-  -- reuse the run already under the cursor instead of writing a second one
-  local base = run_base(take, blk, entry) or cursor_ppq(take)
-
-  reaper.Undo_BeginBlock()
-  local n = each_preset_event(blk, entry, choice, function(i, addr, value)
-    put_at(take, base + i * cfg.tick_gap, addr, value)
-    return true
-  end)
-  relabel_run(take, base, label)
-  reaper.MIDI_Sort(take)
-  reaper.Undo_EndBlock('Apply ' .. blk[1] .. ' ' .. preset_name, -1)
-
-  return true, ('Applied %s (%d events).'):format(preset_name, n)
-end
-
 -- Settings tab --------------------------------------------------------------
+
+local SETTINGS_LABEL = 'MIDI tick gap'
 
 local function tab_settings()
   local em = ImGui.GetFontSize(ctx)
-  local label_w = ImGui.CalcTextSize(ctx, 'Tick gap between events') + em
+  local label_w = ImGui.CalcTextSize(ctx, SETTINGS_LABEL) + em
 
   ImGui.Text(ctx, 'Label events')
   ImGui.SameLine(ctx, label_w)
@@ -1274,22 +1546,53 @@ local function tab_settings()
   _, cfg.label_events = ImGui.Checkbox(ctx, '##label', cfg.label_events)
   ImGui.SetItemTooltip(ctx, 'Write a readable text event alongside each insert')
 
-  ImGui.Text(ctx, 'Live send mode')
-  ImGui.SameLine(ctx, label_w)
-  _, cfg.live = ImGui.Checkbox(ctx, '##live', cfg.live)
-  ImGui.SetItemTooltip(ctx, 'Send messages immediately to this track hardware output; write nothing to the item')
-  ImGui.TextDisabled(ctx, 'Live mode sends immediately and writes nothing to the item.')
-
-  ImGui.Text(ctx, 'Tick gap between events')
+  ImGui.Text(ctx, SETTINGS_LABEL)
   ImGui.SameLine(ctx, label_w)
   -- width must cover the field plus both step buttons, which are square and
   -- one frame high each
   ImGui.SetNextItemWidth(ctx, em * 3.5 + ImGui.GetFrameHeight(ctx) * 2)
-  local changed, v = ImGui.InputInt(ctx, '##gap', cfg.tick_gap, 1, 1)
-  if changed then cfg.tick_gap = clamp(v, 1, 96) end
-  ImGui.SetItemTooltip(ctx, 'Spacing between the events a macro writes. Too small and the hardware cannot keep up.')
+  local changed, v = ImGui.InputInt(ctx, '##gap', cfg.midi_tick_gap, 1, 1)
+  if changed then cfg.midi_tick_gap = clamp(v, 1, 96) end
+  -- PPQ, not milliseconds: this spaces events along the project timeline.
+  -- Hardware previews are paced separately, at a fixed 20 ms interval that
+  -- is not user-configurable.
+  ImGui.SetItemTooltip(ctx,
+    'PPQ spacing between the events a macro writes into the MIDI take. ' ..
+    'Hardware previews use a fixed 20 ms interval instead.')
   ImGui.SameLine(ctx)
-  ImGui.TextDisabled(ctx, ('(applies to the next macro; now %d)'):format(cfg.tick_gap))
+  ImGui.TextDisabled(ctx,
+    ('(PPQ; applies to the next macro, now %d)'):format(cfg.midi_tick_gap))
+end
+
+-- Preview the complete state a system-effect block currently shows: its
+-- macro selector (where the block has one) and every parameter value. Used
+-- when a preset is selected, after system_preset_apply has written the
+-- preset's values into the entries.
+local function preview_system_state(blk, entry, name)
+  local payloads = {}
+  if entry.addr then
+    payloads[#payloads + 1] = dt1({ 0x40, blk.addr_mid, entry.addr,
+                                    clamp(entry.value, 0, #entry.macros - 1) })
+  end
+  for _, e in ipairs(blk[2]) do
+    if not e.macros then
+      payloads[#payloads + 1] = dt1({ 0x40, blk.addr_mid, e.addr, e.value })
+    end
+  end
+  return preview_batch(payloads, name)
+end
+
+-- Height the Settings tab asks for: its two control rows, the tab bar, the
+-- tab inset and the footer. Measured rather than left to WIN_H, which is
+-- what left most of this tab empty.
+local settings_win_h
+
+local function settings_window_h(em)
+  if settings_win_h then return settings_win_h end
+  local row = ImGui.GetFrameHeightWithSpacing(ctx)
+  -- two control rows, plus the tab bar and the footer's separator and row
+  settings_win_h = row * 2 + row * 3 + TAB_PAD * 2 + em
+  return settings_win_h
 end
 
 -- The preset combo, +/-/Insert row shared by every FX_BLOCKS tab (Reverb,
@@ -1308,7 +1611,7 @@ local function fx_preset_row(blk, block_index, label_w, em)
         local ok, msg = system_preset_apply(blk, macro_entry, p)
         if ok then
           fx_preset_sel[blk[1]] = p
-          set_status(("Loaded '%s' (values only; insert to send)." ):format(p.name))
+          preview_system_state(blk, macro_entry, ('%s: %s'):format(blk[1], p.name))
         else set_status(msg) end
       end
     end
@@ -1320,8 +1623,10 @@ local function fx_preset_row(blk, block_index, label_w, em)
     for n, p in ipairs(presets) do if p == selected then i = n end end
     local p = presets[clamp(i + wheel, 1, #presets)]
     local ok, msg = system_preset_apply(blk, macro_entry, p)
-    if ok then fx_preset_sel[blk[1]] = p end
-    set_status(ok and ("Loaded '%s' (values only; insert to send)." ):format(p.name) or msg)
+    if ok then
+      fx_preset_sel[blk[1]] = p
+      preview_system_state(blk, macro_entry, ('%s: %s'):format(blk[1], p.name))
+    else set_status(msg) end
   end
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, '+##systempresetadd' .. blk[1]) then
@@ -1353,31 +1658,54 @@ local function fx_preset_row(blk, block_index, label_w, em)
   draw_preset_popup(em)
 end
 
--- Height the Effects tab asks for, measured like efx_window_h rather than
--- fixed: the tallest block (Delay, 10 parameters) has to fit without
--- scrolling, and the row count comes from fx_blocks.lua, so adding a
--- parameter there resizes the window instead of quietly clipping it.
-local function fx_window_h(em)
-  if fx_win_h then return fx_win_h end
-  local rows = 0
-  for _, blk in ipairs(FX_BLOCKS) do
-    local n = 0
-    for _, e in ipairs(blk[2]) do
-      if not e.macros then n = n + 1 end
-    end
-    if n > rows then rows = n end
+-- Parameter rows in one block -- the rows the Effects tab actually draws for
+-- whichever nested tab is selected.
+local function fx_block_rows(blk)
+  local n = 0
+  for _, e in ipairs(blk[2]) do
+    if not e.macros then n = n + 1 end
   end
+  return n
+end
+
+-- Height the Effects tab asks for, for the nested block currently selected
+-- rather than for the tallest one. Reverb (7 rows) no longer gets Delay's
+-- height, which is what left the large empty area above the footer.
+--
+-- Cached per block name: the measurement depends only on the font and the
+-- row count, both fixed for a given block once the font is loaded.
+local fx_block_h = {}
+
+local function fx_window_h_for(blk, em)
+  if fx_block_h[blk[1]] then return fx_block_h[blk[1]] end
   local row = ImGui.GetFrameHeightWithSpacing(ctx)
   -- Chrome above and below the parameter rows: the outer tab bar, the nested
   -- Reverb/Chorus/Delay tab bar, the preset row, the spacer under it, the
   -- footer separator and its row, plus the tab inset top and bottom. One
-  -- spare row keeps the last parameter clear of the footer.
-  fx_win_h = rows * row + row * 5 + em * 0.4 + TAB_PAD * 2 + em * 2
-  -- Never come out shorter than the hand-tuned height this replaced: the
-  -- measurement above is only as good as its guess at the chrome, and the
-  -- old value was known to very nearly fit.
-  if fx_win_h < 470 then fx_win_h = 470 end
-  return fx_win_h
+  -- spare row keeps the last parameter clear of the footer. No floor here --
+  -- a short block is meant to come out short.
+  fx_block_h[blk[1]] = fx_block_rows(blk) * row + row * 5 + em * 0.4
+                       + TAB_PAD * 2 + em * 2
+  return fx_block_h[blk[1]]
+end
+
+-- The Effects tab's height when it is entered: whichever nested block is
+-- showing. fx_active_block tracks that across frames so a nested tab change
+-- can request a new height even though the outer tab did not change.
+-- request_height is the loop's pending_h, declared below and assigned there;
+-- a nested tab change calls it directly since no outer tab change fires.
+local fx_active_block
+local request_height
+
+local function fx_window_h(em)
+  local blk
+  for _, b in ipairs(FX_BLOCKS) do
+    if b[1] ~= 'EQ' and (b[1] == fx_active_block or not blk) then
+      blk = b
+      if b[1] == fx_active_block then break end
+    end
+  end
+  return fx_window_h_for(blk, em)
 end
 
 local function tab_effects()
@@ -1385,6 +1713,14 @@ local function tab_effects()
   if ImGui.BeginTabBar(ctx, 'fxtabs') then
     for block_index, blk in ipairs(FX_BLOCKS) do
       if blk[1] ~= 'EQ' and ImGui.BeginTabItem(ctx, blk[1]) then
+        -- A nested tab change does not change the outer tab, so the window
+        -- height is requested here instead: Reverb and Delay differ by three
+        -- parameter rows, and without this the shorter block keeps the
+        -- taller one's height.
+        if fx_active_block ~= blk[1] then
+          fx_active_block = blk[1]
+          if request_height then request_height(fx_window_h_for(blk, em)) end
+        end
         ImGui.Dummy(ctx, 0, em * 0.4)
         local label_w = ImGui.CalcTextSize(ctx, 'Time Ratio Right') + em
         fx_preset_row(blk, block_index, label_w, em)
@@ -1530,17 +1866,33 @@ local TABS = {
   { 'EQ', tab_eq, 430 },
   { 'Insertion Effects', tab_insertion, efx_window_h },
   { 'Effects', tab_effects, fx_window_h },
-  { 'Settings', tab_settings },
+  { 'Settings', tab_settings, settings_window_h },
 }
 
 local active_tab, pending_h
 
+-- A tab name restored from session state, applied on the next frame the tab
+-- bar draws. SetTabItemClosed/selection cannot be forced retroactively, so
+-- the bar asks for SetSelected on the one tab whose name matches and then
+-- clears this -- otherwise the user could never leave the restored tab.
+local restore_tab
+
+-- Let a nested tab ask for a new window height mid-frame. SetNextWindowSize
+-- must precede Begin, so this only records the request; the loop applies it
+-- on the next frame, exactly as an outer tab change does.
+request_height = function(h) pending_h = h end
+
 -- Footer row: actions left, status right. Lives outside the scrolling body so
 -- it is always visible and never contributes to the body's scroll range.
+-- Assigned by the loop below, which owns the exit; the footer only asks.
+local request_close
+
 local function footer()
   ImGui.Separator(ctx)
-  -- keep the row at button height even though only text sits here now
-  ImGui.Dummy(ctx, 0, ImGui.GetFrameHeight(ctx))
+  -- Returning to the launcher is an explicit action, not only a window-close:
+  -- the close button is small and easy to miss, and a user who arrived from
+  -- PAGER expects a way back to it. Both go through request_close.
+  if ImGui.Button(ctx, 'Back to PAGER') then request_close() end
   if status ~= '' then
     ImGui.SameLine(ctx)
     local avail_w = ImGui.GetContentRegionAvail(ctx)
@@ -1567,13 +1919,216 @@ local function footer()
   end
 end
 
+-- session state: what a reopened editor restores ----------------------------
+
+-- The restore notice. Shown whenever values arrive without being sent, so the
+-- user is never left wondering whether the hardware already heard them.
+local RESTORED_NOTICE = 'Restored values; not sent to hardware.'
+
+-- Only plain data crosses this boundary. Preset selections are stored by
+-- NAME, not by reference: the preset tables are rebuilt on every visit and
+-- compared with `==` by the combo and the wheel-step, so a decoded copy would
+-- match nothing and silently step from the wrong index. The name is re-looked
+-- up against the live tables on the way back in.
+local function capture_state()
+  local masters = {}
+  for i, m in ipairs(MASTERS) do masters[i] = m.value end
+
+  local sub = {}
+  for i, e in ipairs(EFX_SUB) do sub[i] = e.value end
+
+  -- Per-type insertion parameters, keyed by type index as a string: JSON
+  -- objects have string keys, and a sparse integer table would decode as an
+  -- object anyway. Only types the user actually touched are present.
+  local efx_values = {}
+  for t, ps in pairs(EFX_PARAMS) do
+    local vals = {}
+    for i, e in ipairs(ps) do vals[i] = e.value end
+    efx_values[tostring(t)] = vals
+  end
+
+  local blocks, block_presets = {}, {}
+  for _, blk in ipairs(FX_BLOCKS) do
+    local vals = {}
+    for i, e in ipairs(blk[2]) do vals[i] = e.value end
+    blocks[blk[1]] = vals
+    local sel = fx_preset_sel[blk[1]]
+    if sel then block_presets[blk[1]] = sel.name end
+  end
+
+  local efx_presets_by_type = {}
+  for t, sel in pairs(efx_preset_sel) do
+    if sel then efx_presets_by_type[tostring(t)] = sel.name end
+  end
+
+  local parts, eqs = {}, {}
+  for i = 1, 16 do
+    parts[i] = efx_parts[i] and true or false
+    eqs[i] = eq_parts[i] and true or false
+  end
+
+  return {
+    cfg = { midi_tick_gap = cfg.midi_tick_gap, label_events = cfg.label_events },
+    active_tab = active_tab,
+    efx_type = efx_type,
+    masters = masters,
+    efx_sub = sub,
+    efx_values = efx_values,
+    blocks = blocks,
+    block_presets = block_presets,
+    efx_presets = efx_presets_by_type,
+    efx_parts = parts,
+    eq_parts = eqs,
+  }
+end
+
+-- Assign one value only if it is a number inside the row's own range. Every
+-- restored byte goes through here: state can only come from this same process
+-- today, but it is decoded JSON either way, and a bad value would reach the
+-- hardware as a malformed SysEx byte rather than as a visible error.
+local function restore_value(entry, v)
+  if type(v) ~= 'number' then return end
+  if entry.min and v < entry.min then return end
+  if entry.max and v > entry.max then return end
+  entry.value = v
+end
+
+local function restore_list(entries, vals)
+  if type(vals) ~= 'table' then return end
+  for i, entry in ipairs(entries) do restore_value(entry, vals[i]) end
+end
+
+-- Apply a saved state. Passive by contract: this writes values into the
+-- tables the UI draws from and queues nothing, so nothing reaches the
+-- hardware until the user's next edit.
+local function restore_state(st)
+  if type(st) ~= 'table' then return false end
+
+  if type(st.cfg) == 'table' then
+    if type(st.cfg.midi_tick_gap) == 'number' then
+      cfg.midi_tick_gap = clamp(math.floor(st.cfg.midi_tick_gap), 1, 96)
+    end
+    if type(st.cfg.label_events) == 'boolean' then
+      cfg.label_events = st.cfg.label_events
+    end
+  end
+
+  if type(st.efx_type) == 'number' and EFX_TYPES[st.efx_type] then
+    efx_type = math.floor(st.efx_type)
+  end
+
+  restore_list(MASTERS, st.masters)
+  restore_list(EFX_SUB, st.efx_sub)
+
+  if type(st.efx_values) == 'table' then
+    for key, vals in pairs(st.efx_values) do
+      local ps = EFX_PARAMS[tonumber(key)]
+      if ps then restore_list(ps, vals) end
+    end
+  end
+
+  if type(st.blocks) == 'table' then
+    for _, blk in ipairs(FX_BLOCKS) do restore_list(blk[2], st.blocks[blk[1]]) end
+  end
+
+  -- Selections are re-resolved against the tables this visit built, so what
+  -- lands in fx_preset_sel is the same object the combo will compare against.
+  -- A preset that no longer exists (a saved one deleted from the file since)
+  -- simply leaves the default selection in place.
+  if type(st.block_presets) == 'table' then
+    for block_index, blk in ipairs(FX_BLOCKS) do
+      local want = st.block_presets[blk[1]]
+      if type(want) == 'string' then
+        for _, p in ipairs(system_presets_for(blk, blk[2][1], block_index)) do
+          if p.name == want then fx_preset_sel[blk[1]] = p break end
+        end
+      end
+    end
+  end
+
+  if type(st.efx_presets) == 'table' then
+    for key, want in pairs(st.efx_presets) do
+      local t = tonumber(key)
+      if t and type(want) == 'string' then
+        for _, p in ipairs(efx_presets_for(t) or {}) do
+          if p.name == want then efx_preset_sel[t] = p break end
+        end
+      end
+    end
+  end
+
+  if type(st.efx_parts) == 'table' then
+    for i = 1, 16 do efx_parts[i] = st.efx_parts[i] and true or false end
+  end
+  if type(st.eq_parts) == 'table' then
+    for i = 1, 16 do eq_parts[i] = st.eq_parts[i] and true or false end
+  end
+
+  -- The tab is restored by name; the loop applies the matching height when it
+  -- next draws that tab, so no measurement is needed here.
+  if type(st.active_tab) == 'string' then
+    for _, tab in ipairs(TABS) do
+      if tab[1] == st.active_tab then restore_tab = st.active_tab break end
+    end
+  end
+
+  return true
+end
+
+-- Save the current project's state, then load the project now active. Called
+-- when the user switches REAPER project tabs with the window open: the old
+-- project keeps what it had, pending previews are dropped rather than sent to
+-- the new project's hardware route, and the new values arrive passively.
+local function check_project()
+  local now = session:project_key()
+  if now == bound_project then return end
+
+  -- Both calls name their project explicitly. REAPER already reports `now`,
+  -- but the values still in these tables belong to `bound_project` -- letting
+  -- either call resolve the project itself would file the old project's
+  -- values under the new project's key and then read that same record back,
+  -- which looks exactly like a restore that changed nothing.
+  session:save(SESSION_TOOL, capture_state(), bound_project)
+  hw:cancel()
+  restore_state(session:load(SESSION_TOOL, now) or {})
+  bound_project = now
+  set_status(RESTORED_NOTICE)
+end
+
+-- Set by the footer button; read by the loop, which owns the one exit.
+-- A flag rather than a direct call because closing has to happen between
+-- frames, not in the middle of one that is still drawing into the context.
+local want_close = false
+request_close = function() want_close = true end
+
+-- The caller to hand control back to, and the guard that keeps it to one
+-- call. Start-up failure, the footer button, the window close button and a
+-- tool switch all land on finish(); PAGER must be reopened exactly once
+-- however many of them fire.
+local on_close_cb, closed
+local finish
+
 local function loop()
+  -- A frame can still be scheduled when the window has already gone: REAPER
+  -- runs deferred callbacks one more time after the one that closed. Drawing
+  -- into a destroyed context is a crash, not an error, so this returns first.
+  if not ctx then return end
+
   if status ~= '' and reaper.time_precise() - status_time > STATUS_SECS then
     status = ''
   end
 
-  ImGui.PushFont(ctx, font, FONT_SIZE)
-  Theme.push(ctx, ImGui)
+  -- A project-tab change is only observable by asking, so it is checked once
+  -- per frame before anything is drawn from the values it may replace.
+  check_project()
+
+  -- Release at most one due hardware message per frame. This is the only
+  -- thing that moves the preview queue; nothing sends directly.
+  hw:pump()
+
+  -- Font and theme together, both owned by theme.lua so every PAGER window
+  -- draws the same. Balanced by Theme.end_frame at the bottom of the loop.
+  Theme.begin_frame(ctx, ImGui, FONT_SIZE)
   -- Apply the default size on the first frame only: Cond_Always so a size
   -- saved in ReaImGui's ini cannot override it, then stop so the window
   -- stays resizable. (Cond_FirstUseEver would defer to that saved size.)
@@ -1596,15 +2151,22 @@ local function loop()
   if visible then
     -- Reserve one frame's height for the footer. ChildFlags_None: no
     -- ResizeY, so the divider is not a drag handle.
-    -- false means collapsed or fully clipped: skip the contents, but still
-    -- call EndChild, which unlike EndTabBar is unconditional.
+    -- false means collapsed or fully clipped, and the binding has already
+    -- ended the child in that case -- so EndChild belongs inside the branch,
+    -- exactly like EndTabBar. See the note on the panes in tab_insertion.
     -- Reserve the footer: its button row plus the separator above it.
     local footer_h = ImGui.GetFrameHeightWithSpacing(ctx)
                    + select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_ItemSpacing))
     if ImGui.BeginChild(ctx, 'body', 0, -footer_h, ImGui.ChildFlags_None) then
       if ImGui.BeginTabBar(ctx, 'tabs') then
         for _, tab in ipairs(TABS) do
-          if ImGui.BeginTabItem(ctx, tab[1]) then
+          -- One-shot: select the restored tab on the frame after a restore,
+          -- then forget it so the user's own clicks are not overridden.
+          local flags = ImGui.TabItemFlags_None
+          if restore_tab == tab[1] then
+            flags = ImGui.TabItemFlags_SetSelected
+          end
+          if ImGui.BeginTabItem(ctx, tab[1], nil, flags) then
             -- Record the wanted height on a tab change; SetNextWindowSize
             -- must be called before Begin, so the loop applies it next frame.
             if active_tab ~= tab[1] then
@@ -1624,19 +2186,88 @@ local function loop()
           end
         end
         ImGui.EndTabBar(ctx)
+        restore_tab = nil
       end
+      ImGui.EndChild(ctx)
     end
-    ImGui.EndChild(ctx)
-
 
     footer()
     ImGui.End(ctx)
   end
 
-  ImGui.PopFont(ctx)
-  Theme.pop(ctx, ImGui)
+  Theme.end_frame(ctx, ImGui)
 
-  if open then reaper.defer(loop) end
+  if open and not want_close then
+    reaper.defer(loop)
+  else
+    finish()
+  end
 end
 
-reaper.defer(loop)
+-- The single exit. Saves what the next visit restores, drops the hardware
+-- queue, releases the context, and returns control to whoever started this
+-- tool.
+--
+-- Order matters: state is captured before the context goes, because capture
+-- reads the same tables the UI drew from, and the queue is cancelled rather
+-- than flushed -- a preview the user never heard must not play into a window
+-- that is no longer open.
+finish = function()
+  if closed then return end
+  closed = true
+
+  session:save(SESSION_TOOL, capture_state())
+
+  -- Closing drops whatever is still queued. Pending previews are never
+  -- converted into MIDI events -- they simply stop existing.
+  hw:cancel()
+
+  -- Releasing the context is dropping the last reference to it: ReaImGui has
+  -- no DestroyContext, and documents that "unattached objects are
+  -- automatically destroyed when left unused" (see Detach). The font is
+  -- attached to this context and goes with it; theme.lua holds its cache on
+  -- weak keys so that entry is collected too rather than pinning a dead
+  -- context for the rest of the session.
+  --
+  -- The loop can still be called once more after this -- REAPER runs the
+  -- already-scheduled defer -- which is why loop() returns early on a nil ctx
+  -- instead of drawing into a context that no longer exists.
+  ctx = nil
+
+  local cb = on_close_cb
+  on_close_cb = nil
+  if cb then cb() end
+end
+
+-- Entry point. PAGER calls this; on_close is invoked once, when the window is
+-- gone and its state has been saved.
+--
+-- Everything per-visit is reset here rather than at load, because the module
+-- is required once and started many times: a second visit must not inherit
+-- the first one's transient status line, close flag or first-frame sizing.
+local function start(on_close)
+  on_close_cb, closed, want_close = on_close, false, false
+  status, status_time = '', 0
+  first_frame, pending_h = true, nil
+
+  ctx = ImGui.CreateContext('PAGER - Effects Editor')
+  -- native OS window frame instead of ImGui's drawn title bar
+  ImGui.SetConfigVar(ctx, ImGui.ConfigVar_ViewportsNoDecoration, 0)
+
+  -- Restore before the first frame draws, so the window opens showing the
+  -- values it will keep rather than defaults that visibly change. Passive by
+  -- contract: nothing is queued for the hardware here.
+  bound_project = session:project_key()
+  local saved = session:load(SESSION_TOOL)
+  if saved and restore_state(saved) then set_status(RESTORED_NOTICE) end
+
+  reaper.defer(loop)
+end
+
+-- Required by PAGER, which calls start(). Run directly as an action it still
+-- opens on its own, with no launcher to return to.
+local M = { start = start }
+
+if not rawget(_G, 'PAGER_TOOL') then start(nil) end
+
+return M

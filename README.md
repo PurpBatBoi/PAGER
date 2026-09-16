@@ -1,9 +1,20 @@
 # Purp’s Advanced GS Editor for REAPER (PAGER)
 
-A [REAPER](https://www.reaper.fm/) ReaScript for controlling a Roland SC-8850
-with GS System Exclusive (SysEx) messages. It can write messages into the
-active MIDI take at the edit cursor, or send them directly to the track's MIDI
-hardware output.
+A [REAPER](https://www.reaper.fm/) ReaScript suite for controlling a Roland
+SC-8850 with GS System Exclusive (SysEx) messages. It previews your edits on
+the hardware as you make them, and writes messages into the active MIDI take
+when you ask it to.
+
+One action, **PAGER**, opens a launcher holding the whole suite:
+
+```
+[Part] [Patch] [Drum] [Effects] [MIDI-Export]
+```
+
+Effects and MIDI-Export are available now; Part, Patch and Drum are shown
+grayed out until they are written. Choosing a tool closes the launcher and
+opens that tool, and closing the tool brings the launcher back, so only one
+window is ever on screen.
 
 ## Features
 
@@ -14,6 +25,7 @@ hardware output.
 - Two-band global EQ, with per-part EQ on/off and built-in curves
 - Reverb, chorus, and delay controls with macro presets
 - Named presets stored in a shareable JSON file
+- A vendor-neutral MIDI exporter, in the same launcher
 
 ## Requirements
 
@@ -21,24 +33,75 @@ hardware output.
 - [ReaPack](https://reapack.com/), the REAPER extension used to install
   ReaImGui
 - [ReaImGui](https://codeberg.org/cfillion/reaimgui), version 0.10 or newer
-- A Roland SC-8850 
+- [js_ReaScriptAPI](https://forum.cockos.com/showthread.php?t=212174), used by
+  the MIDI exporter's save dialog
+- [MIDIUtils](https://github.com/jeremybernstein/ReaScripts), from the
+  sockmonkey72 MIDI scripts in ReaPack, used by the MIDI exporter
+- A Roland SC-8850, for the effects editor. The MIDI exporter is
+  vendor-neutral and needs no particular hardware.
 
 ## Installation
 
 1. Install ReaPack in REAPER.
-2. Use ReaPack to install ReaImGui, version 0.10 or newer.
+2. Use ReaPack to install ReaImGui, version 0.10 or newer, js_ReaScriptAPI,
+   and the sockmonkey72 MIDI scripts (for MIDIUtils).
 3. Open **Extensions > ReaPack > Manage repositories**.
 4. Click **Import repositories** and add:
    `https://raw.githubusercontent.com/PurpBatBoi/PAGER/main/index.xml`
 5. Click **Apply**, then open **Browse packages** and install **PAGER**.
-6. In REAPER, open the action list and run `PAGER/effects_editor.lua`.
+6. In REAPER, open the action list and run `PAGER/pager.lua`. That is the
+   only action the package installs; the tools open from its launcher.
 
 ## Use
 
-Select a MIDI item or open a MIDI editor, position the edit cursor, then run
-the script. By default it writes SysEx events to the active MIDI take. Enable
-**Live hardware send** in the Settings tab to send directly to the track's
-configured MIDI hardware output.
+Run the **PAGER** action and pick a tool.
+
+The launcher and the tool take turns: picking a tool closes the launcher, and
+closing the tool — with its **Back to PAGER** button, with Cancel in MIDI
+Export, or with the window's close button — opens the launcher again. A
+successful export closes MIDI Export and shows `Exported: <filename>` on the
+launcher's status line instead of a popup.
+
+Values you set are remembered for the rest of the REAPER session, so
+reopening a tool puts back what you left, including the tab you were on. Each
+project tab keeps its own values, and everything resets when REAPER closes.
+Restored values are not sent anywhere: the Effects Editor says "Restored
+values; not sent to hardware." until your next edit.
+
+### Effects Editor
+
+Select a MIDI item or open a MIDI editor, position the edit cursor, then open
+**Effects** from the launcher.
+
+Editing and inserting are two separate things:
+
+- **Editing previews on the hardware.** Releasing a slider, choosing an
+  insertion-effect type, or choosing a preset sends that state to the track's
+  configured MIDI hardware output. Nothing is written to the MIDI take.
+  Messages are paced 20 ms apart, and a newer selection replaces whatever is
+  left of an older one.
+- **Insert writes to the MIDI take.** The Insert buttons write at the edit
+  cursor and send nothing, because the preview already happened while you
+  were editing. Events in a run are spaced by the **MIDI tick gap** setting,
+  which is PPQ spacing on the project timeline, not hardware timing.
+- **The reset buttons do both.** GS Reset, GM1 Reset and GM2 Reset each send
+  to the hardware and write into the take. If the track has no hardware
+  output the reset is still written, and the status line says so.
+- **The part checkboxes are the exception.** "Parts using EFX" and "Parts
+  using EQ" write to the MIDI take the moment they are clicked.
+
+A track needs a MIDI hardware output configured for previews to be audible.
+Without one, editing still works and the status line reports that nothing was
+sent; REAPER gives no delivery confirmation either way, so the status line
+reports what was submitted, not what the device received.
+
+### MIDI Export
+
+**MIDI-Export** writes a standard MIDI file from the project or the time
+selection. It is vendor-neutral and needs no particular hardware, and its
+options are remembered per project tab like the editor's. A failed export
+stays open with the reason on its status line, so the settings that caused it
+are still in front of you.
 
 ## Presets
 
@@ -90,7 +153,7 @@ The built-in presets (Reverb's `Room 1`, the EQ curves, and each effect's
 
 ## Third-party
 
-"json.lua" library from https://github.com/rxi/json.lua
+"json.lua" library from https://github.com/rxi/json.lua, vendored at `lib/json.lua`
 
 ## License
 

@@ -54,6 +54,50 @@ local VARS = {
   { 'StyleVar_PopupBorderSize', 1.0 },
 }
 
+-- The one font every PAGER window draws with. Declared here rather than in
+-- each tool so the launcher, the Effects Editor and MIDI Export cannot drift
+-- apart: one family, one size, measured the same way everywhere.
+--
+-- 'sans-serif' is a ReaImGui generic family name, resolved to whatever the
+-- host system uses. It needs no font file shipped with the package.
+theme.FONT_FAMILY = 'sans-serif'
+theme.FONT_SIZE = 14
+
+-- Fonts are per-context resources: a font object must be attached to the
+-- context that draws with it, and a context is destroyed when its tool closes.
+-- So one font is created and cached per context rather than once per module
+-- -- a font held over from a destroyed context is a dead handle.
+--
+-- Keyed weakly, so a closed tool's entry can be collected rather than pinning
+-- a dead context for the rest of the session.
+--
+-- Weak keys alone are NOT enough to make a hit trustworthy. REAPER reuses the
+-- address of a released context for the next one, and the old entry survives
+-- until a GC cycle that may not have run yet -- so a lookup can hit on a new
+-- context and hand back the font attached to the destroyed one. PushFont then
+-- fails with "expected a valid ImGui_Font*", which is what closing a tool and
+-- reopening PAGER used to do.
+--
+-- So the handle is revalidated on every lookup instead of trusted. This is
+-- the pattern ReaImGui's own docs use for cached resources (see the image
+-- cache in api/image.cpp).
+local fonts = setmetatable({}, { __mode = 'k' })
+
+-- Create and attach this context's font, or return the one already made.
+-- Attach must happen before the first frame that uses the font.
+function theme.font(ctx, ImGui)
+  local f = fonts[ctx]
+  -- A stale entry is indistinguishable from a live one by identity alone;
+  -- only ValidatePtr can tell, because the address may have been recycled.
+  if f and not ImGui.ValidatePtr(f, 'ImGui_Font*') then f = nil end
+  if not f then
+    f = ImGui.CreateFont(theme.FONT_FAMILY)
+    ImGui.Attach(ctx, f)
+    fonts[ctx] = f
+  end
+  return f
+end
+
 function theme.push(ctx, ImGui)
   for _, color in ipairs(COLORS) do
     ImGui.PushStyleColor(ctx, ImGui[color[1]], color[2])
@@ -66,6 +110,21 @@ end
 function theme.pop(ctx, ImGui)
   ImGui.PopStyleVar(ctx, #VARS)
   ImGui.PopStyleColor(ctx, #COLORS)
+end
+
+-- Font and style together, for a tool that wants the whole presentation in
+-- one call. Balanced against theme.end_frame: one PushFont and one PushStyle*
+-- run here, one PopFont and the matching pops run there. A tool that needs to
+-- push the font itself (to measure text before Begin at a known size) can
+-- still use theme.font/push directly -- these two are the common path.
+function theme.begin_frame(ctx, ImGui, size)
+  ImGui.PushFont(ctx, theme.font(ctx, ImGui), size or theme.FONT_SIZE)
+  theme.push(ctx, ImGui)
+end
+
+function theme.end_frame(ctx, ImGui)
+  theme.pop(ctx, ImGui)
+  ImGui.PopFont(ctx)
 end
 
 return theme

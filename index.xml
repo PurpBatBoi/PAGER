@@ -2,15 +2,27 @@
 <index version="1" name="PAGER">
   <category name="PAGER">
     <reapack name="PAGER" type="script" desc="Roland GS editor suite for REAPER">
-      <version name="0.1.0" author="PurpBatBoi" time="2026-09-15T00:00:00Z">
-        <changelog><![CDATA[Initial PAGER package]]></changelog>
-        <source main="main" file="editor/effects_editor.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/effects_editor.lua</source>
+      <version name="0.2.0" author="PurpBatBoi" time="2026-09-19T00:00:00Z">
+        <changelog><![CDATA[PAGER launcher: one action opens the suite.
+- The launcher is now the only action; the tools are internal files.
+- Effects Editor previews on the hardware as you edit and writes to the
+  MIDI take only when an Insert button asks for it.
+- Shared font and theme across every PAGER window.
+- Tool values are restored for the rest of the REAPER session, separately
+  per project tab.]]></changelog>
+        <!-- The launcher is the only main action. Everything below is an
+             internal file it loads, so the action list stays clean. -->
+        <source main="main" file="editor/pager.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/pager.lua</source>
+        <source file="editor/effects_editor.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/effects_editor.lua</source>
+        <source file="editor/midi-export.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/midi-export.lua</source>
+        <source file="editor/hardware_output.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/hardware_output.lua</source>
+        <source file="editor/session_state.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/session_state.lua</source>
+        <source file="editor/theme.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/theme.lua</source>
         <source file="editor/gs_sysex.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/gs_sysex.lua</source>
         <source file="editor/efx_params.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/efx_params.lua</source>
         <source file="editor/efx_types.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/efx_types.lua</source>
         <source file="editor/fx_blocks.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/fx_blocks.lua</source>
-        <source file="editor/json.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/json.lua</source>
-        <source file="editor/theme.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/theme.lua</source>
+        <source file="lib/json.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/lib/json.lua</source>
       </version>
     </reapack>
   </category>

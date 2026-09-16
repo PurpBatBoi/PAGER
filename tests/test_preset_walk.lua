@@ -12,8 +12,9 @@
 -- blocks are the real fx_blocks.lua. Run with any Lua:
 --   lua editor/test_preset_walk.lua
 
-local dir = arg and arg[0] and arg[0]:match('^(.*)[/\\]') or 'editor'
-package.path = dir .. '/?.lua;' .. package.path
+local dir = arg and arg[0] and arg[0]:match('^(.*)[/\\]') or 'tests'
+local EDITOR = dir .. '/../editor/'
+package.path = EDITOR .. '?.lua;' .. dir .. '/../lib/?.lua;' .. package.path
 
 local FX_BLOCKS = require 'fx_blocks'
 
@@ -21,7 +22,7 @@ local FX_BLOCKS = require 'fx_blocks'
 -- REAPER, so compile just this function: if its body changes, this runs the
 -- change rather than a stale copy.
 local function load_walk()
-  local path = dir .. '/effects_editor.lua'
+  local path = EDITOR .. 'effects_editor.lua'
   local f = assert(io.open(path, 'r'), 'cannot open ' .. path)
   local src = f:read('a')
   f:close()
