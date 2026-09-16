@@ -159,6 +159,31 @@ end
 
 local NO_TAKE = 'No MIDI take: open a MIDI editor or select a MIDI item.'
 
+-- status line ---------------------------------------------------------------
+
+local status, status_time = '', 0
+local STATUS_SECS = 4
+
+local function set_status(msg)
+  status, status_time = msg, reaper.time_precise()
+end
+
+-- Live echo for a single parameter row, on release of the widget.
+-- In item mode this does nothing: parameter edits stay in memory until the
+-- tab's explicit Insert/Apply action, which is what writes the run. In live
+-- mode there is no such action to wait for -- the hardware is the only
+-- destination -- so the value goes out as soon as the drag ends. Called by
+-- every parameter row, so no tab can be left out of it.
+local function live_echo(addr_mid, addr, value, name)
+  if not cfg.live then return end
+  local take = get_take()
+  -- send_live needs a take only to find the track carrying the hardware
+  -- output, so the item still has to exist even though nothing is written.
+  if not take then set_status(NO_TAKE) return end
+  local ok, err = send_live(dt1({ 0x40, addr_mid, addr, value }), take)
+  set_status(ok and ('Sent ' .. name .. ' to hardware.') or err)
+end
+
 -- Every write path starts the same way: there must be a take, and in live mode
 -- the payload goes straight to the hardware instead of into the item. Returns
 -- the take to write into, or nil plus the (ok, message) pair to return as-is.
@@ -196,19 +221,42 @@ local function insert_sysex(payload, name)
   return true, 'Inserted ' .. name .. ' at cursor.'
 end
 
--- status line ---------------------------------------------------------------
-
-local status, status_time = '', 0
-local STATUS_SECS = 4
-
-local function set_status(msg)
-  status, status_time = msg, reaper.time_precise()
-end
-
 -- shared helpers ------------------------------------------------------------
 
 local function clamp(v, lo, hi)
   return math.max(lo, math.min(hi, v))
+end
+
+-- Decide whether the slider just drawn should send, and apply the
+-- double-click reset. Call immediately after the widget, with the entry it
+-- edits; returns true on the frame the value is settled and should go out.
+--
+-- Two things have to be true at once. A slider reports a value every frame
+-- it is dragged, but only the value it lands on is worth sending, so the
+-- send waits for IsItemDeactivatedAfterEdit -- the frame the widget goes
+-- inactive having been edited. And a double-click reset is not a single
+-- event: the click has already dragged the value somewhere and the button
+-- stays down afterwards, so the default is held over every frame until
+-- release. Deactivation then fires on the release frame and counts the
+-- reset as the value change it is, so the flag is already set there; the
+-- latch only has to suppress the frames in between.
+--
+-- One copy, because three rows use it (master_fader, param_row,
+-- efx_param_row) and a per-row copy already drifted once.
+local function slider_settled(e)
+  local send = ImGui.IsItemDeactivatedAfterEdit(ctx)
+  if ImGui.IsItemHovered(ctx) and ImGui.IsMouseDoubleClicked(ctx, ImGui.MouseButton_Left) then
+    e.resetting = true
+  end
+  if e.resetting then
+    e.value = e.default
+    if ImGui.IsMouseDown(ctx, ImGui.MouseButton_Left) then
+      send = false
+    else
+      e.resetting = false
+    end
+  end
+  return send
 end
 
 -- Master tab ----------------------------------------------------------------
@@ -253,21 +301,8 @@ local function master_fader(m, label_w, slider_w)
                                      m.min, m.max, fmt,
                                      ImGui.SliderFlags_ClampOnInput)
   if changed then m.value = v end
-  local send = ImGui.IsItemDeactivatedAfterEdit(ctx)
 
-  -- Double-click resets to the default. The slider has already moved the value
-  -- to the click position by this point, and the button stays down afterwards,
-  -- so latch until release and keep forcing the default while it holds.
-  if ImGui.IsItemHovered(ctx) and ImGui.IsMouseDoubleClicked(ctx, ImGui.MouseButton_Left) then
-    m.resetting = true
-  end
-  if m.resetting then
-    m.value = m.default
-    send = false
-    if not ImGui.IsMouseDown(ctx, ImGui.MouseButton_Left) then m.resetting = false end
-  end
-
-  return send
+  return slider_settled(m)
 end
 
 local function tab_master()
@@ -620,7 +655,7 @@ local function param_row_fmt(e)
   return '%d'
 end
 
-local function param_row(e, label_w, field_w)
+local function param_row(e, label_w, field_w, addr_mid)
   ImGui.Text(ctx, e.name)
   -- the manual's glossed name, on the label, and only when it adds something
   if e.full and e.full ~= e.name then ImGui.SetItemTooltip(ctx, e.full) end
@@ -632,15 +667,10 @@ local function param_row(e, label_w, field_w)
                                       e.min, e.max, param_row_fmt(e),
                                       ImGui.SliderFlags_ClampOnInput)
   if changed then e.value = v end
-  if ImGui.IsItemHovered(ctx) and ImGui.IsMouseDoubleClicked(ctx, ImGui.MouseButton_Left) then
-    e.resetting = true
-  end
-  if e.resetting then
-    e.value = e.default
-    if not ImGui.IsMouseDown(ctx, ImGui.MouseButton_Left) then e.resetting = false end
-  end
+  local send = slider_settled(e)
+  if send then live_echo(addr_mid, e.addr, e.value, e.name) end
 
-  return ImGui.IsItemDeactivatedAfterEdit(ctx)
+  return send
 end
 
 -- Width of an insertion parameter's value field: wide enough for a slider,
@@ -693,15 +723,8 @@ local function efx_param_row(e, label_w, em, show_range)
                                       e.min, e.max, fmt,
                                       ImGui.SliderFlags_ClampOnInput)
   if changed then e.value = v end
-  -- Double-click resets to the default. Parameter edits are state-only;
-  -- Insert preset is the explicit write action for this tab.
-  if ImGui.IsItemHovered(ctx) and ImGui.IsMouseDoubleClicked(ctx, ImGui.MouseButton_Left) then
-    e.resetting = true
-  end
-  if e.resetting then
-    e.value = e.default
-    if not ImGui.IsMouseDown(ctx, ImGui.MouseButton_Left) then e.resetting = false end
-  end
+  -- Insertion effect parameters all live on the 40 03 block.
+  if slider_settled(e) then live_echo(0x03, e.addr, e.value, e.name) end
   if show_range and not parts then
     ImGui.SameLine(ctx)
     ImGui.TextDisabled(ctx, e.range)
@@ -1239,40 +1262,6 @@ local function apply_macro(blk, entry, choice)
   return true, ('Applied %s (%d events).'):format(preset_name, n)
 end
 
--- A hand edit to one parameter of an existing run: rewrite that event and mark
--- the run Custom, since it no longer matches the named preset.
-local function edit_in_run(blk, entry, e)
-  local take = get_take()
-  if not take then return nil end
-  local base = run_base(take, blk, entry)
-  if not base then return nil end
-
-  if cfg.live then
-    local ok, err = send_live(dt1({ 0x40, blk.addr_mid, e.addr, e.value }), take)
-    if not ok then return false, err end
-    return true, 'Sent ' .. e.name .. ' to hardware.'
-  end
-
-  reaper.Undo_BeginBlock()
-  -- The run is laid out macro-first (when the block has a macro register --
-  -- EQ does not, see each_preset_event), so this parameter's slot is its
-  -- position among the non-macro entries. Same indexing as each_preset_event.
-  local slot = entry.addr and 0 or -1
-  for _, p in ipairs(blk[2]) do
-    if not p.macros then
-      slot = slot + 1
-      if p == e then
-        put_at(take, base + slot * cfg.tick_gap, { 0x40, blk.addr_mid, e.addr }, e.value)
-        break
-      end
-    end
-  end
-  relabel_run(take, base, blk[1] .. ': Custom')
-  reaper.MIDI_Sort(take)
-  reaper.Undo_EndBlock('Edit ' .. blk[1] .. ' ' .. e.name, -1)
-  return true, ('Updated %s (run now Custom).'):format(e.name)
-end
-
 -- Settings tab --------------------------------------------------------------
 
 local function tab_settings()
@@ -1401,7 +1390,7 @@ local function tab_effects()
         fx_preset_row(blk, block_index, label_w, em)
 
         for _, e in ipairs(blk[2]) do
-          if not e.macros then param_row(e, label_w, em * EFX_FIELD_W_EM) end
+          if not e.macros then param_row(e, label_w, em * EFX_FIELD_W_EM, blk.addr_mid) end
         end
         ImGui.EndTabItem(ctx)
       end
@@ -1511,7 +1500,7 @@ local function tab_eq()
   fx_preset_row(EQ_BLOCK, EQ_BLOCK_INDEX, label_w, em)
 
   for _, e in ipairs(EQ_BLOCK[2]) do
-    if not e.macros then param_row(e, label_w, em * EFX_FIELD_W_EM) end
+    if not e.macros then param_row(e, label_w, em * EFX_FIELD_W_EM, EQ_BLOCK.addr_mid) end
   end
 
   ImGui.Dummy(ctx, 0, em * 0.5)
