@@ -30,18 +30,14 @@ local function load_slider_settled()
   local src = f:read('a')
   f:close()
 
-  local body = src:match('\n(local function slider_settled%(e%).-\n end?)\n')
-             or src:match('\n(local function slider_settled%(e%).-\nend)\n')
+  local body = src:match('\n(local function slider_settled%(e%).-\nend)\n')
   assert(body, 'slider_settled not found in ' .. path ..
                 ' -- was it renamed? this test must follow it')
 
-  local env = { ImGui = ImGui, ctx = nil }
-  local chunk = assert((loadstring or load)(
-    body .. '\nreturn slider_settled', 'slider_settled'))
-  if setfenv then setfenv(chunk, env) else
-    chunk = assert(load(body .. '\nreturn slider_settled',
-                        'slider_settled', 't', env))
-  end
+  -- ImGui is all the function reaches for, so a small environment keeps it
+  -- from quietly growing a dependency on editor state unnoticed.
+  local chunk = assert(load(body .. '\nreturn slider_settled',
+                            'slider_settled', 't', { ImGui = ImGui }))
   return chunk()
 end
 
