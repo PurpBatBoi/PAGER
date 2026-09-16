@@ -9,6 +9,8 @@
         <source file="editor/efx_params.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/efx_params.lua</source>
         <source file="editor/efx_types.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/efx_types.lua</source>
         <source file="editor/fx_blocks.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/fx_blocks.lua</source>
+        <source file="editor/json.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/json.lua</source>
+        <source file="editor/theme.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/theme.lua</source>
       </version>
     </reapack>
   </category>

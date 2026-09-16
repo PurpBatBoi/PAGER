@@ -36,6 +36,17 @@ local DELAY = {
   { 'PanRepeat',    { 0, 110, 21, 32,  97, 127, 67, 64, 40,  0 } },
 }
 
+-- Built-in EQ curves, as raw bytes: { low freq, low gain, high freq, high gain }.
+-- Gain 64 (0x40) is flat; each step is 1 dB. See docs/SC-8850_OM.pdf p.86/236.
+local EQ = {
+  { 'Flat',       { 0, 64, 0, 64 } },
+  { 'Bass Boost', { 0, 70, 0, 64 } },  -- low +6 dB @ 200 Hz
+  { 'Bright',     { 0, 64, 0, 70 } },  -- high +6 dB @ 3 kHz
+  { 'Loudness',   { 0, 70, 0, 68 } },  -- low +6, high +4
+  { 'Scoop',      { 1, 58, 0, 68 } },  -- low -6 @ 400 Hz, high +4
+  { 'Telephone',  { 1, 52, 1, 52 } },  -- both -12
+}
+
 return {
   { 'Reverb', {
     { name = 'Macro',            addr = 0x30, min = 0, max = 7,   default = 0x04,
@@ -46,7 +57,7 @@ return {
     { name = 'Time',             addr = 0x34, min = 0, max = 127, default = 0x40 },
     { name = 'Delay Feedback',   addr = 0x35, min = 0, max = 127, default = 0x00 },
     { name = 'Predelay Time',    addr = 0x37, min = 0, max = 127, default = 0x00 },
-  } },
+  }, addr_mid = 0x01 },
   { 'Chorus', {
     { name = 'Macro',            addr = 0x38, min = 0, max = 7,   default = 0x02,
       macros = CHORUS },
@@ -58,7 +69,7 @@ return {
     { name = 'Depth',            addr = 0x3E, min = 0, max = 127, default = 0x13 },
     { name = 'Send To Reverb',   addr = 0x3F, min = 0, max = 127, default = 0x00 },
     { name = 'Send To Delay',    addr = 0x40, min = 0, max = 127, default = 0x00 },
-  } },
+  }, addr_mid = 0x01 },
   { 'Delay', {
     { name = 'Macro',            addr = 0x50, min = 0,   max = 9,    default = 0x00,
       macros = DELAY },
@@ -72,5 +83,22 @@ return {
     { name = 'Level',            addr = 0x58, min = 0,   max = 127,  default = 0x40 },
     { name = 'Feedback',         addr = 0x59, min = 0,   max = 127,  default = 0x50 },
     { name = 'Send To Reverb',   addr = 0x5A, min = 0,   max = 127,  default = 0x00 },
-  } },
+  }, addr_mid = 0x01 },
+  -- Global EQ, manual p.86/236 (40 02 xx). One shared set, not per-part --
+  -- the per-part switch (40 4x 20) is separate, driven by the 16 checkboxes
+  -- on the EQ tab, not by this block. No hardware macro register exists, so
+  -- 'Preset' is addr = nil and each_preset_event/insert_system_preset must
+  -- skip emitting it when the address is absent.
+  { 'EQ', {
+    { name = 'Preset',       addr = nil, min = 0, max = #EQ - 1, default = 0,
+      macros = EQ },
+    { name = 'EQ Low Freq',  addr = 0x00, min = 0,  max = 1,  default = 0,
+      enum = { '200 Hz', '400 Hz' } },
+    { name = 'EQ Low Gain',  addr = 0x01, min = 52, max = 76, default = 64,
+      db = true },
+    { name = 'EQ High Freq', addr = 0x02, min = 0,  max = 1,  default = 0,
+      enum = { '3 kHz', '6 kHz' } },
+    { name = 'EQ High Gain', addr = 0x03, min = 52, max = 76, default = 64,
+      db = true },
+  }, addr_mid = 0x02 },
 }

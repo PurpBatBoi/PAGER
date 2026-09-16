@@ -1,8 +1,8 @@
-/docs/
-/baseline/
-/scripts/
+/docs
+/scripts
+/baseline
 
-# Editor and OS
+
 /.vscode/
 *.bak
 __pycache__/

@@ -12,6 +12,7 @@ hardware output.
 - 65 insertion-effect types and their parameters
 - Per-part insertion-effect assignment
 - Reverb, chorus, and delay controls with macro presets
+- Named Insertion Effects presets stored in a shareable JSON file
 
 ## Requirements
 
@@ -37,6 +38,10 @@ Select a MIDI item or open a MIDI editor, position the edit cursor, then run
 the script. By default it writes SysEx events to the active MIDI take. Enable
 **Live hardware send** in the Settings tab to send directly to the track's
 configured MIDI hardware output.
+
+## Third-party
+
+"json.lua" library from https://github.com/rxi/json.lua
 
 ## License
 
