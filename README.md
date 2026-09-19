@@ -25,7 +25,8 @@ back, so only one window is ever on screen.
 - Two-band global EQ, with per-part EQ on/off and built-in curves
 - Reverb, chorus, and delay controls with macro presets
 - Named presets stored in a shareable JSON file
-- A vendor-neutral MIDI exporter, in the same launcher (prototype)
+- A vendor-neutral, multi-port MIDI exporter — 16 channels per port, so a
+  four-port SC-8850 exports all 64 parts (prototype)
 
 ## Requirements
 
@@ -116,6 +117,23 @@ selection. It is vendor-neutral and needs no particular hardware, and its
 options are remembered per project tab like the editor's. A failed export
 stays open with the reason on its status line, so the settings that caused it
 are still in front of you.
+
+It is **multi-port**, so an export is not limited to 16 channels. Each
+track's port comes from its MIDI hardware output, and when the selection
+spans more than one device the file carries an `FF 21` port meta per track,
+which is what players read to keep two tracks on the same channel apart.
+Four ports of 16 channels is 64 parts — a full SC-8850 — and nothing caps
+it at four.
+
+Two things to know about it:
+
+- Ports are written by **Type 1** only. Type 0 is a single track by
+  definition, so it has nowhere to put the port metas and everything
+  collapses onto one port.
+- A track with no MIDI hardware output set inherits its parent folder's, and
+  falls back to port 0. Ports are renumbered densely from zero in device
+  order, so what the file preserves is which tracks share a port, not
+  REAPER's own device numbers.
 
 ## Presets
 
