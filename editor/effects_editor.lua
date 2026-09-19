@@ -330,6 +330,16 @@ local MASTERS = {
 
 for _, m in ipairs(MASTERS) do m.value = m.default end
 
+-- Masters moved since the last insert, keyed by name -- what "Insert only
+-- changed" writes. Names rather than indices, so reordering MASTERS cannot
+-- silently point a mark at the wrong control.
+--
+-- Deliberately NOT part of the saved session state: it records what this
+-- visit's edits were, and a restore is passive by contract. Coming back to
+-- the tool with values restored but nothing yet touched should offer
+-- nothing to insert, which is exactly an empty table.
+local master_dirty = {}
+
 -- One labelled row: name on the left, horizontal slider on the right.
 -- Horizontal SliderInt (unlike the VSliderInt this replaced) natively
 -- supports Ctrl+Click text entry, so there is no separate input box to
@@ -382,7 +392,59 @@ local function insert_masters()
   put_label(take, base, name)
   reaper.MIDI_Sort(take)
   reaper.Undo_EndBlock('Insert ' .. name, -1)
+  master_dirty = {}
   return true, ('Inserted %s (%d events) at cursor.'):format(name, #MASTERS)
+end
+
+-- Write only the masters touched since the last insert.
+--
+-- The four masters are independent addresses rather than a block, so there
+-- is no reason to commit all of them to change one -- inserting the whole
+-- set writes three events that say what the device is already doing, and
+-- they sit in the lane looking like deliberate automation.
+--
+-- "Modified" means moved, not "differs from the default": a value nudged
+-- away and back is still an edit the user made and may well want written,
+-- and there is no preset here to measure against the way the effect tabs
+-- measure against theirs.
+--
+-- The marks clear on any insert, so the button always means "what changed
+-- since the last time I wrote", which is what makes it usable repeatedly
+-- while dialling values in.
+local function insert_masters_changed()
+  local take = get_take()
+  if not take then return false, NO_TAKE end
+
+  -- Kept in MASTERS order rather than touch order, so a run reads the same
+  -- way as a full insert and lands in the same slot sequence.
+  local changed = {}
+  for _, m in ipairs(MASTERS) do
+    if master_dirty[m.name] then changed[#changed + 1] = m end
+  end
+  if #changed == 0 then
+    return false, 'No master values changed since the last insert.'
+  end
+
+  local base = cursor_ppq(take)
+  reaper.Undo_BeginBlock()
+  for i, m in ipairs(changed) do
+    local ppq = base + (i - 1) * cfg.midi_tick_gap
+    delete_sysex_at(take, ppq)
+    reaper.MIDI_InsertTextSysexEvt(take, false, false, ppq, SYSEX, m.build(m.value))
+  end
+
+  -- Name the label for what was actually written: 'Master settings' on a
+  -- one-event run would misreport the lane.
+  local names = {}
+  for i, m in ipairs(changed) do names[i] = m.name end
+  local label = 'Master: ' .. table.concat(names, ', ')
+  put_label(take, base, label)
+  reaper.MIDI_Sort(take)
+  reaper.Undo_EndBlock('Insert ' .. label, -1)
+
+  master_dirty = {}
+  return true, ('Inserted %s (%d event%s) at cursor.')
+                 :format(label, #changed, #changed == 1 and '' or 's')
 end
 
 local function tab_master()
@@ -396,6 +458,9 @@ local function tab_master()
       -- what commits the values. The master name keys the coalescing, since
       -- these payloads carry their own addresses rather than a shared one.
       preview_payload(m.build(m.value), 'Master ' .. m.name, 'master:' .. m.name)
+      -- Marked here, where the edit settles, so the mark follows the same
+      -- rule as the preview: released sliders count, dragging does not.
+      master_dirty[m.name] = true
     end
   end
 
@@ -405,6 +470,30 @@ local function tab_master()
     set_status(msg)
   end
   ImGui.SetItemTooltip(ctx, 'Write all four master values at the playhead')
+
+  ImGui.SameLine(ctx)
+  -- Disabled with nothing marked rather than hidden: a button that vanishes
+  -- between edits is harder to find than one that greys out, and the
+  -- disabled state itself says there is nothing pending.
+  local pending = 0
+  for _, m in ipairs(MASTERS) do
+    if master_dirty[m.name] then pending = pending + 1 end
+  end
+  if pending == 0 then ImGui.BeginDisabled(ctx, true) end
+  if ImGui.Button(ctx, 'Insert only changed##masterinsertchanged') then
+    local _, msg = insert_masters_changed()
+    set_status(msg)
+  end
+  if pending == 0 then ImGui.EndDisabled(ctx) end
+  -- Hovered with AllowWhenDisabled, and after EndDisabled: a disabled item
+  -- is not hovered under the default flags, so SetItemTooltip here would
+  -- show nothing in exactly the state the user most needs explaining.
+  if ImGui.IsItemHovered(ctx, ImGui.HoveredFlags_AllowWhenDisabled) then
+    ImGui.SetTooltip(ctx, pending == 0
+      and 'No master values have changed since the last insert'
+      or ('Write only the %d master value%s changed since the last insert')
+           :format(pending, pending == 1 and '' or 's'))
+  end
 
   ImGui.Dummy(ctx, 0, em * 0.5)
   for i, r in ipairs(RESETS) do

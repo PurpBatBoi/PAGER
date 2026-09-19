@@ -83,6 +83,17 @@ Editing and inserting are two separate things:
   cursor and send nothing, because the preview already happened while you
   were editing. Events in a run are spaced by the **MIDI tick gap** setting,
   which is PPQ spacing on the project timeline, not hardware timing.
+- **You can write less than everything.** Next to the plain Insert buttons:
+  - **Insert only changed** on the Master tab writes just the master values
+    you have moved since your last insert, so changing the pan does not also
+    rewrite level, key-shift and tune with values the device already holds.
+    It greys out when nothing has moved, and both Insert buttons clear the
+    marks once they have written.
+  - **Insert only changes** on the Insertion Effects and system-effect tabs
+    writes the parameters that differ from the selected preset. If a
+    matching run already sits at the cursor each parameter is updated in its
+    own slot in that run; otherwise the changed values are packed together
+    from the cursor. Either way it writes only what you edited.
 - **The reset buttons do both.** GS Reset, GM1 Reset and GM2 Reset each send
   to the hardware and write into the take. If the track has no hardware
   output the reset is still written, and the status line says so.
