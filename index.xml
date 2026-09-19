@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <index version="1" name="PAGER">
-  <category name="PAGER">
+  <!-- ReaPack installs each source at Scripts/<index name>/<category>/<file>.
+       The index is already named PAGER, so a category named PAGER too would
+       give Scripts/PAGER/PAGER/. "." keeps the category out of the path and
+       lets the editor/ and lib/ prefixes below supply the structure, so an
+       install mirrors the repository and the ../lib/ lookups in the tools
+       resolve exactly as they do in a checkout. -->
+  <category name=".">
     <reapack name="PAGER" type="script" desc="Roland GS editor suite for REAPER">
-      <version name="0.2.0" author="PurpBatBoi" time="2026-09-19T00:00:00Z">
+      <version name="0.2.1" author="PurpBatBoi" time="2026-09-19T12:00:00Z">
         <changelog><![CDATA[PAGER launcher: one action opens the suite.
 - The launcher is now the only action; the tools are internal files.
 - Effects Editor previews on the hardware as you edit and writes to the
   MIDI take only when an Insert button asks for it.
 - Shared font and theme across every PAGER window.
 - Tool values are restored for the rest of the REAPER session, separately
-  per project tab.]]></changelog>
+  per project tab.
+- Installs into Scripts/PAGER/ rather than Scripts/PAGER/PAGER/.]]></changelog>
         <!-- The launcher is the only main action. Everything below is an
              internal file it loads, so the action list stays clean. -->
         <source main="main" file="editor/pager.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/pager.lua</source>

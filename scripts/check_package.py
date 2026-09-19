@@ -11,6 +11,8 @@ agree, without installing anything.
   * every module a packaged file requires is itself packaged
   * PAGER is the only main action, so the action list shows one entry
   * the launcher's own tool list is packaged
+  * every <version> ships files and is named once
+  * the install path is Scripts/PAGER/<repo layout>, not a doubled folder
 
 Modules that come from elsewhere are not our files to ship: `imgui` is
 ReaImGui's, and MIDIUtils is installed separately through ReaPack.
@@ -25,6 +27,64 @@ INDEX = os.path.join(ROOT, 'index.xml')
 
 # Required at run time but installed separately, so they are not packaged.
 EXTERNAL = {'imgui', 'MIDIUtils'}
+
+
+def versions_ok():
+    """Every <version> must actually ship files, and be uniquely named.
+
+    A version block with no <source> installs a package with nothing in it,
+    and two blocks sharing a name make "latest" ambiguous. Both are easy to
+    produce when editing this file by hand and invisible until someone
+    installs.
+    """
+    root = ET.parse(INDEX).getroot()
+    ok, seen = True, set()
+    for version in root.iter('version'):
+        name = version.get('name')
+        count = len(list(version.iter('source')))
+        if count == 0:
+            print(f'index.xml: version {name} ships no files')
+            ok = False
+        if name in seen:
+            print(f'index.xml: version {name} is declared more than once')
+            ok = False
+        seen.add(name)
+    return ok
+
+
+def install_paths_ok():
+    """Where ReaPack will actually put the files.
+
+    Source::targetPath builds `Scripts/<index name>/<category>/<file>`, and
+    Path::Split drops a "." component, so a category of "." installs straight
+    into Scripts/<index name>/. Naming the category "PAGER" under an index
+    also named PAGER is what produced Scripts/PAGER/PAGER/.
+
+    The layout matters beyond tidiness: the tools resolve their siblings with
+    SCRIPT_DIR and reach the JSON library through `../lib/`, so editor/ and
+    lib/ have to land as siblings exactly as they sit in the repository.
+    """
+    root = ET.parse(INDEX).getroot()
+    index_name = root.get('name')
+    ok = True
+
+    for category in root.iter('category'):
+        name = category.get('name')
+        if name == index_name:
+            print(f'index.xml: category "{name}" repeats the index name, '
+                  f'which installs into Scripts/{index_name}/{name}/ -- '
+                  f'use "." to install into Scripts/{index_name}/')
+            ok = False
+
+    # The two directories the tools expect to find beside each other.
+    prefixes = {f.split('/')[0] for f in
+                (s.get('file') or '' for s in root.iter('source')) if '/' in f}
+    for want in ('editor', 'lib'):
+        if want not in prefixes:
+            print(f'index.xml: nothing installs under {want}/ -- the tools '
+                  f'resolve modules relative to their own directory')
+            ok = False
+    return ok
 
 
 def packaged():
@@ -58,7 +118,9 @@ def required_by(path):
 
 def main():
     mains, files = packaged()
-    ok = True
+    # Both run: `and` would short-circuit and hide the second report.
+    versions, paths = versions_ok(), install_paths_ok()
+    ok = versions and paths
 
     if mains != ['editor/pager.lua']:
         print(f'index.xml: PAGER must be the only main action, got {mains}')
