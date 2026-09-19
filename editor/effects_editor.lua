@@ -967,8 +967,8 @@ end
 -- Rows the Parameters pane shows before it scrolls. The table runs from 3 to
 -- 20 rows with a median of 11, so ten complete rows keeps the window short
 -- while covering most effects outright; the rest scroll inside the pane.
--- GTR Multi 1 (11 parameters) is the acceptance case: ten rows visible, the
--- eleventh reachable by scrolling.
+-- GTR Multi 1 (20 parameters) is the acceptance case: ten rows visible, the
+-- rest reachable by scrolling.
 local EFX_FIT_ROWS = 10
 
 local win_w_cache, efx_win_h
@@ -1011,24 +1011,49 @@ local function efx_window_h(em)
   if efx_win_h then return efx_win_h end
   local row = ImGui.GetFrameHeightWithSpacing(ctx)
   local text_row = ImGui.GetTextLineHeightWithSpacing(ctx)
-  local pad_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_FramePadding))
+  -- WindowPadding and the border, because that is what a bordered child
+  -- insets its rows by -- see the note in tab_insertion.
+  local pad_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_WindowPadding))
+  local border = ImGui.GetStyleVar(ctx, ImGui.StyleVar_ChildBorderSize)
+  local spacing_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_ItemSpacing))
 
-  -- the panes, exactly as tab_insertion sizes them
-  local panes = EFX_FIT_ROWS * row + pad_y * 2
+  -- the panes, exactly as tab_insertion sizes them: ten frames, the nine
+  -- gaps between them, and the child's own inset.
+  local panes = EFX_FIT_ROWS * ImGui.GetFrameHeight(ctx)
+                + (EFX_FIT_ROWS - 1) * spacing_y
+                + pad_y * 2 + border * 2
 
   -- Everything tab_insertion draws above the panes, counted one for one:
+  --   the 'EFX Type:' label                      (one text row, own line)
   --   the type / Insert / preset / buttons row   (one frame row, all SameLine)
   --   the 'Parts using EFX:' label               (one text row)
   --   the 16 part checkboxes                     (one frame row)
   --   the em*0.5 spacer under them
-  --   the 'Parameters' / 'Insertion Sub' heading (one text row)
+  --
+  -- 'EFX Type:' is easy to miss when reading the tab: it is a Text on its own
+  -- line, and only the widgets after it are chained with SameLine.
+  --
+  -- The 'Parameters' / 'Insertion Sub' heading is deliberately NOT counted
+  -- here. It is drawn after this point, and tab_insertion's own clamp takes
+  -- it off the room it measures (`room = avail - text_row - TAB_PAD`), so
+  -- counting it in both places charges the same row twice and leaves the
+  -- panes exactly one heading short. It is added back below, with the
+  -- TAB_PAD the clamp also subtracts, so the window covers what the clamp
+  -- will take rather than what is literally drawn above the panes.
   local above = row * 2 + text_row * 2 + em * 0.5
 
-  -- and the chrome outside the tab body: the outer tab bar, the tab inset
-  -- top and bottom, and the footer's separator plus its row.
-  local outside = row * 2 + TAB_PAD * 2
+  -- What the clamp in tab_insertion subtracts from the room it measures: the
+  -- heading row it leaves space for, and the bottom tab inset. The window has
+  -- to include these or the clamp trims the panes by exactly this much.
+  local clamped_off = text_row + TAB_PAD
 
-  efx_win_h = panes + above + outside
+  -- and the chrome outside the tab body: the outer tab bar, the tab inset top
+  -- and bottom, and the footer -- reserved verbatim as the frame loop does
+  -- it, `GetFrameHeightWithSpacing + ItemSpacing.y`, so the two cannot drift.
+  local footer = row + spacing_y
+  local outside = row + footer + TAB_PAD * 2
+
+  efx_win_h = panes + above + clamped_off + outside
   return efx_win_h
 end
 
@@ -1173,11 +1198,29 @@ local function tab_insertion()
   -- starting cursor, so a child of size 0 would otherwise fill to the edge.
   local avail_w = ImGui.GetContentRegionAvail(ctx)
   local col_w = (avail_w - TAB_PAD - em) / 2
-  -- Ten complete rows plus the child's own vertical frame padding is what
-  -- the window is sized for. GetStyleVar returns x then y, so the second
-  -- value is the one that matters here.
-  local pad_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_FramePadding))
-  local col_h = EFX_FIT_ROWS * ImGui.GetFrameHeightWithSpacing(ctx) + pad_y * 2
+  -- Ten complete rows plus the child's own inset.
+  --
+  -- The inset is WindowPadding, not FramePadding: ChildFlags_Borders "show[s]
+  -- an outer border and enable[s] WindowPadding" (ReaImGui api/window.cpp), so
+  -- a bordered child indents its contents by WindowPadding top and bottom and
+  -- draws a border line outside that. Budgeting FramePadding instead is
+  -- several pixels short at the default style, which cost the tenth row -- it
+  -- drew, clipped, at the bottom edge.
+  --
+  -- GetStyleVar returns x then y; the second value is the one that matters.
+  --
+  -- Ten rows are ten frames and the NINE gaps between them, not ten
+  -- GetFrameHeightWithSpacing: that returns frame + spacing, so ten of them
+  -- include a trailing gap after the last row. ImGui puts that trailing
+  -- spacing inside the content, before the bottom padding, so counting it
+  -- leaves the tenth row pressed against the border with its padding pushed
+  -- out of view.
+  local pad_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_WindowPadding))
+  local border = ImGui.GetStyleVar(ctx, ImGui.StyleVar_ChildBorderSize)
+  local spacing_y = select(2, ImGui.GetStyleVar(ctx, ImGui.StyleVar_ItemSpacing))
+  local col_h = EFX_FIT_ROWS * ImGui.GetFrameHeight(ctx)
+                + (EFX_FIT_ROWS - 1) * spacing_y
+                + pad_y * 2 + border * 2
 
   -- ...but never taller than the room actually left on this tab. The window
   -- height is an estimate of the chrome above and below; if it is off by a

@@ -8,13 +8,13 @@ when you ask it to.
 One action, **PAGER**, opens a launcher holding the whole suite:
 
 ```
-[Part] [Patch] [Drum] [Effects] [MIDI-Export]
+[Part Editor] [Patch Editor] [Drum Editor] [Effects Editor] [MIDI-Export]
 ```
 
-Effects and MIDI-Export are available now; Part, Patch and Drum are shown
-grayed out until they are written. Choosing a tool closes the launcher and
-opens that tool, and closing the tool brings the launcher back, so only one
-window is ever on screen.
+Effects Editor and MIDI-Export are available now; the Part, Patch and Drum
+editors are shown grayed out until they are written. Choosing a tool closes
+the launcher and opens that tool, and closing the tool brings the launcher
+back, so only one window is ever on screen.
 
 ## Features
 
@@ -25,7 +25,7 @@ window is ever on screen.
 - Two-band global EQ, with per-part EQ on/off and built-in curves
 - Reverb, chorus, and delay controls with macro presets
 - Named presets stored in a shareable JSON file
-- A vendor-neutral MIDI exporter, in the same launcher
+- A vendor-neutral MIDI exporter, in the same launcher (prototype)
 
 ## Requirements
 
@@ -33,8 +33,7 @@ window is ever on screen.
 - [ReaPack](https://reapack.com/), the REAPER extension used to install
   ReaImGui
 - [ReaImGui](https://codeberg.org/cfillion/reaimgui), version 0.10 or newer
-- [js_ReaScriptAPI](https://forum.cockos.com/showthread.php?t=212174), used by
-  the MIDI exporter's save dialog
+- [js_ReaScriptAPI](https://forum.cockos.com/showthread.php?t=212174)
 - [MIDIUtils](https://github.com/jeremybernstein/ReaScripts), from the
   sockmonkey72 MIDI scripts in ReaPack, used by the MIDI exporter
 - A Roland SC-8850, for the effects editor. The MIDI exporter is
@@ -71,7 +70,7 @@ values; not sent to hardware." until your next edit.
 ### Effects Editor
 
 Select a MIDI item or open a MIDI editor, position the edit cursor, then open
-**Effects** from the launcher.
+**Effects Editor** from the launcher.
 
 Editing and inserting are two separate things:
 
@@ -96,6 +95,10 @@ sent; REAPER gives no delivery confirmation either way, so the status line
 reports what was submitted, not what the device received.
 
 ### MIDI Export
+
+> **Prototype.** This tool is still early: expect bugs and missing features.
+> Check anything it writes before you rely on it, and keep the project file
+> you exported from.
 
 **MIDI-Export** writes a standard MIDI file from the project or the time
 selection. It is vendor-neutral and needs no particular hardware, and its

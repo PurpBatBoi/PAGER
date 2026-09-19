@@ -200,21 +200,42 @@ do
   check(st.contexts == 1, 'one context per launcher, got ' .. st.contexts)
   check(st.title == 'PAGER', 'the window is named PAGER, got ' .. tostring(st.title))
 
+  -- The row is checked against the launcher's own TOOLS table rather than a
+  -- copy of the labels: the wording is the author's to change, and a test
+  -- that hardcodes it fails on a rename that broke nothing. What must hold
+  -- is the order, the count, and which entries are inert.
   check(#st.buttons == 5, 'five tool buttons, got ' .. #st.buttons)
-  local order = {}
+  local order, want = {}, {}
   for i, b in ipairs(st.buttons) do order[i] = b.label end
-  check(table.concat(order, ' ') == 'Part Patch Drum Effects MIDI-Export',
-    'the row is [Part] [Patch] [Drum] [Effects] [MIDI-Export], got ' ..
-    table.concat(order, ' '))
+  for i, t in ipairs(launcher.TOOLS) do want[i] = t.label end
+  check(table.concat(order, ' ') == table.concat(want, ' '),
+    'the buttons are drawn in TOOLS order, got ' .. table.concat(order, ' '))
+
+  -- Part, Patch and Drum first, then the two that exist. The plan fixes this
+  -- order: the unwritten tools are visible but lead the row.
+  check(#launcher.TOOLS == 5, 'five tools, got ' .. #launcher.TOOLS)
+  for i = 1, 3 do
+    check(launcher.TOOLS[i].file == nil,
+      ('tool %d (%s) is not written yet and must have no file')
+        :format(i, launcher.TOOLS[i].label))
+  end
+  check(launcher.TOOLS[4].file == 'effects_editor.lua',
+    'the fourth tool is the Effects Editor')
+  check(launcher.TOOLS[5].file == 'midi-export.lua',
+    'the fifth tool is MIDI Export')
 
   -- Disabled through BeginDisabled, not gray text: a drawn-gray button still
-  -- takes the click.
+  -- takes the click. Exactly the three without a file.
   local disabled = {}
   for _, b in ipairs(st.buttons) do
     if b.disabled then disabled[#disabled + 1] = b.label end
   end
-  check(table.concat(disabled, ' ') == 'Part Patch Drum',
-    'Part, Patch and Drum are disabled; got ' .. table.concat(disabled, ' '))
+  check(#disabled == 3, 'three buttons are disabled, got ' .. #disabled)
+  for i = 1, 3 do
+    check(disabled[i] == launcher.TOOLS[i].label,
+      ('the disabled buttons are the unwritten tools; expected %s, got %s')
+        :format(launcher.TOOLS[i].label, tostring(disabled[i])))
+  end
   check(st.disable_depth == 0, 'every BeginDisabled is matched by EndDisabled')
 
   -- The shared presentation, from theme.lua.
@@ -254,7 +275,7 @@ do
   -- and starts the tool from its close path. So the tool starts after End()
   -- and after the context is released -- which is what live_contexts == 0
   -- inside the stand-in tool's start asserts -- rather than a frame later.
-  st.click = 'Effects'
+  st.click = launcher.TOOLS[4].label
   st.live_contexts = 0   -- the launcher drops its reference in finish()
   draw(st)
   check(#st.started == 1 and st.started[1] == 'effects_editor.lua',
@@ -285,7 +306,7 @@ do
   local launcher, st = load_launcher({ tools = { ['midi-export.lua'] = {} } })
   launcher.start(nil)
   draw(st)
-  st.click = 'MIDI-Export'
+  st.click = launcher.TOOLS[5].label
   st.live_contexts = 0
   draw(st)
   check(#st.started == 1, 'clicking MIDI-Export starts the exporter')
@@ -308,7 +329,7 @@ do
   local launcher, st = load_launcher({ tools = { ['effects_editor.lua'] = false } })
   launcher.start(nil)
   draw(st)
-  st.click = 'Effects'
+  st.click = launcher.TOOLS[4].label
   st.live_contexts = 0
   draw(st)
 
@@ -328,7 +349,7 @@ do
   })
   launcher.start(nil)
   draw(st)
-  st.click = 'Effects'
+  st.click = launcher.TOOLS[4].label
   st.live_contexts = 0
   draw(st)
 
