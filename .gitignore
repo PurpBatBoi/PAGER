@@ -1,16 +1,13 @@
 # Reference material and working notes. Kept on disk, out of the repo:
 # docs/reference/ holds vendor API dumps (REAPER, ReaImGui, MIDIUtils) that
-# are large and not ours to redistribute, and docs/project/ holds the
-# refactor plan and research notes. scripts/check_imgui_arity.py reads
-# docs/reaimgui-master/, so this folder has to exist locally to run the
-# checks -- it just does not belong in the package.
+# are large and not ours to redistribute.
 /docs
 
 # Exports produced by testing the MIDI exporter, which land wherever the
 # output path points -- often the repo root.
 *.mid
 
-/.vscode/
+
 *.bak
 __pycache__/
 *.pyc
