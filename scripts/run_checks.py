@@ -17,7 +17,7 @@ TESTS_DIR = os.path.join(ROOT, 'tests')
 # Parsed, not run: a syntax error in either of these is only reported by
 # REAPER when the user opens the window, so it is caught here instead.
 PARSED = [os.path.join(EDITOR, name)
-          for name in ('effects_editor.lua', 'pager.lua')]
+          for name in ('effects_editor.lua', 'part_editor.lua', 'pager.lua')]
 
 # Test files are discovered rather than listed, so a phase that adds one only
 # has to drop it in tests/. Sorted so a failure is always reported in the same

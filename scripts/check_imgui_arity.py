@@ -29,7 +29,8 @@ API = os.path.join(ROOT, 'docs', 'reaimgui-master', 'api', '*.cpp')
 # Every editor file that draws ReaImGui. Files that do not exist yet are
 # skipped, so the later phases can add pager.lua without touching this.
 TARGETS = [os.path.join(ROOT, 'editor', name) for name in
-           ('effects_editor.lua', 'midi-export.lua', 'theme.lua', 'pager.lua')]
+           ('effects_editor.lua', 'part_editor.lua', 'midi-export.lua',
+            'theme.lua', 'pager.lua')]
 
 
 def signatures():

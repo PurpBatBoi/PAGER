@@ -91,10 +91,12 @@ function H.take(opts)
   opts = opts or {}
   local t = {
     events = {},          -- { ppq, typ, payload } in insertion order
+    ccs = {},             -- { ppq, chanmsg, chan, msg2, msg3 } in insertion order
     log = {},             -- every observable call, in order
     sorted = 0,           -- MIDI_Sort count
     undo = {},            -- Undo_EndBlock descriptions
     cursor = opts.cursor or 1000,
+    ppq_per_qn = opts.ppq_per_qn or 960,
     hwout = opts.hwout == nil and 0 or opts.hwout,
     sent = {},            -- framed messages handed to the hardware
   }
@@ -128,6 +130,40 @@ function H.take(opts)
     end
     table.sort(out, function(a, b) return a.ppq < b.ppq end)
     return out
+  end
+
+  -- CC events as short readable strings, in insertion order. The Part Editor
+  -- writes into this lane, and a failure is only legible if it prints as MIDI.
+  function t:cc_list()
+    local out = {}
+    for _, c in ipairs(self.ccs) do
+      out[#out + 1] = ('@%d ch%d #%d=%d')
+        :format(c.ppq, c.chan, c.msg2, c.msg3)
+    end
+    return out
+  end
+
+  -- CC events at one tick, in index order.
+  function t:cc_at(ppq)
+    local out = {}
+    for _, c in ipairs(self.ccs) do
+      if c.ppq == ppq then out[#out + 1] = c end
+    end
+    return out
+  end
+
+  -- Seed a CC event directly, as though something else had written it. Used
+  -- to prove that replacement leaves unrelated events alone.
+  function t:add_cc(ppq, chan, msg2, msg3, chanmsg)
+    self.ccs[#self.ccs + 1] = { ppq = ppq, chanmsg = chanmsg or 0xB0,
+                                chan = chan, msg2 = msg2, msg3 = msg3 }
+    return self
+  end
+
+  -- Seed a text/sysex event directly, for the same reason.
+  function t:add_evt(ppq, typ, payload)
+    self.events[#self.events + 1] = { ppq = ppq, typ = typ, payload = payload }
+    return self
   end
 
   -- The distinct ticks a run occupies, ascending.
@@ -179,8 +215,31 @@ function H.reaper(take, extra)
       take.log[#take.log + 1] = { 'delete', idx }
     end,
     MIDI_CountEvts = function()
-      return true, 0, 0, #take.events
+      return true, 0, #take.ccs, #take.events
     end,
+    -- The CC lane. REAPER indexes it from 0 and the array is 1-based, so
+    -- every index crossing this boundary is converted exactly once -- the
+    -- same rule the text/sysex calls above follow.
+    MIDI_GetCC = function(_, idx)
+      local c = take.ccs[idx + 1]
+      if not c then return false end
+      return true, false, false, c.ppq, c.chanmsg, c.chan, c.msg2, c.msg3
+    end,
+    MIDI_InsertCC = function(_, _, _, ppq, chanmsg, chan, msg2, msg3)
+      take.ccs[#take.ccs + 1] = { ppq = ppq, chanmsg = chanmsg, chan = chan,
+                                  msg2 = msg2, msg3 = msg3 }
+      take.log[#take.log + 1] = { 'insert_cc', ppq, chan, msg2, msg3 }
+      return true
+    end,
+    MIDI_DeleteCC = function(_, idx)
+      assert(take.ccs[idx + 1], 'MIDI_DeleteCC on a missing index')
+      table.remove(take.ccs, idx + 1)
+      take.log[#take.log + 1] = { 'delete_cc', idx }
+      return true
+    end,
+    -- Quarter notes to ticks. The Part Editor derives its run spacing from
+    -- the distance between two of them, so this has to be linear and exact.
+    MIDI_GetPPQPosFromProjQN = function(_, qn) return qn * take.ppq_per_qn end,
     MIDI_GetTextSysexEvt = function(_, idx)
       local e = take.events[idx + 1]
       if not e then return false end

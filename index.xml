@@ -22,6 +22,10 @@
         <source main="main" file="editor/pager.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/pager.lua</source>
         <source file="editor/effects_editor.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/effects_editor.lua</source>
         <source file="editor/midi-export.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/midi-export.lua</source>
+        <source file="editor/part_editor.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/part_editor.lua</source>
+        <source file="editor/part_params.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/part_params.lua</source>
+        <source file="editor/part_messages.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/part_messages.lua</source>
+        <source file="editor/part_insert.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/part_insert.lua</source>
         <source file="editor/hardware_output.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/hardware_output.lua</source>
         <source file="editor/session_state.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/session_state.lua</source>
         <source file="editor/theme.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/theme.lua</source>

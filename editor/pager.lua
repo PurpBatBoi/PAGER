@@ -61,7 +61,7 @@ local STATUS_SECS = 6
 -- through BeginDisabled rather than as gray text, so ImGui also refuses the
 -- click and the hover -- a fake-gray button still activates.
 local TOOLS = {
-  { label = 'Part Editor' },
+  { label = 'Part Editor',        file = 'part_editor.lua' },
   { label = 'Patch Editor' },
   { label = 'Drum Editor' },
   { label = 'Effects Editor',     file = 'effects_editor.lua' },

@@ -28,6 +28,33 @@ M.INTERVAL = 0.020
 -- edits queued behind it survive. Resets clear everything.
 local PRESET, PARAM = 'preset', 'param'
 
+-- Event kinds. Until the Part Editor there was only one -- every message was
+-- a Roland SysEx payload carried without F0/F7 and framed at the send
+-- boundary. Part previews add raw channel messages, which must NOT be framed:
+-- an F0 in front of a Control Change is a different message entirely.
+--
+-- The kind travels on the queue entry rather than being sniffed from the
+-- bytes, because a payload's first byte is not a reliable discriminator and a
+-- wrong guess is silent -- the hardware simply ignores what it cannot parse.
+local SYSEX, CHANNEL = 'sysex', 'channel'
+
+-- Build the raw bytes of one channel message. `channel` is zero-based, as the
+-- status nibble wants it.
+function M.channel_bytes(status, channel, data1, data2)
+  local bytes = { (status & 0xF0) | (channel & 0x0F), data1 & 0x7F }
+  if data2 then bytes[#bytes + 1] = data2 & 0x7F end
+  return string.char(table.unpack(bytes))
+end
+
+-- One typed event, as part_messages.lua emits it, converted into the payload
+-- and kind this queue stores. A Control Change is status 0xB0.
+function M.encode_event(e)
+  if e.kind == 'cc' then
+    return M.channel_bytes(0xB0, e.channel, e.cc, e.value), CHANNEL
+  end
+  return e.payload, SYSEX
+end
+
 -- construction --------------------------------------------------------------
 
 -- deps.reaper : the reaper table (GetMediaItemTake_Track,
@@ -90,13 +117,18 @@ end
 -- Put messages on the queue and start the clock if it is not already running.
 -- The first message of an idle queue is due immediately; the rest follow at
 -- one interval each, so a batch is paced but never delayed at its start.
-function M:_append(payloads, dev, class, addr)
+--
+-- `kind` defaults to SYSEX, which is what every caller before the Part Editor
+-- sends and why those callers did not have to change. `run` marks the entries
+-- of one ordered group so coalescing can leave them alone.
+function M:_append(payloads, dev, class, addr, kind, run)
   if #self.queue == 0 and not self.next_at then
     self.next_at = self:now()
   end
   for _, payload in ipairs(payloads) do
     self.queue[#self.queue + 1] =
-      { payload = payload, dev = dev, class = class, addr = addr }
+      { payload = payload, dev = dev, class = class, addr = addr,
+        kind = kind or SYSEX, run = run }
   end
 end
 
@@ -122,13 +154,77 @@ function M:preview_param(payload, take, addr)
   if not dev then return false, err end
   if addr then
     for _, m in ipairs(self.queue) do
-      if m.class == PARAM and m.addr == addr then
+      if m.class == PARAM and m.addr == addr and not m.run then
         m.payload, m.dev = payload, dev
         return true
       end
     end
   end
   self:_append({ payload }, dev, PARAM, addr)
+  return true
+end
+
+-- Drop every pending parameter entry for one logical parameter, optionally
+-- only the ones belonging to a multi-message run.
+--
+-- A run is replaced whole or not at all: rewriting one message of an RPN in
+-- place would leave the selector of the old value in front of the Data Entry
+-- of the new one.
+function M:_drop_param(addr, only_runs)
+  local kept = {}
+  for _, m in ipairs(self.queue) do
+    local mine = m.class == PARAM and m.addr == addr
+                 and (not only_runs or m.run)
+    if not mine then kept[#kept + 1] = m end
+  end
+  self.queue = kept
+end
+
+-- A settled Part edit, as the ordered typed event list part_messages.lua
+-- produces. One logical parameter, one call -- whether that parameter encodes
+-- to a single Control Change, a single DT1 write, or a six-message RPN run.
+--
+-- `addr` identifies the logical parameter, not a wire address, so the same
+-- coalescing rule applies across encodings: a newer edit to the same control
+-- replaces its unsent predecessor even when the user flipped `Use SysEx?`
+-- between the two. What is never done is coalescing INSIDE a run, or
+-- reordering one -- an RPN whose Null arrives before its Data Entry writes
+-- nothing, and the queue is the last place that ordering could be lost.
+function M:preview_events(events, take, addr)
+  local dev, err = self:resolve(take)
+  if not dev then return false, err end
+  if #events == 0 then return true end
+
+  local run = #events > 1
+
+  -- Replace whatever this parameter already had pending, whichever shape it
+  -- was. The two directions are not symmetric:
+  --
+  -- Replacing with a run clears everything pending for the parameter, run or
+  -- single, and appends the new run at the end. Its length differs from
+  -- whatever was there, so there is no position to preserve.
+  --
+  -- Replacing with a single message clears any pending run first -- a run
+  -- cannot be partially rewritten -- and then rewrites a surviving single
+  -- message in place, which keeps the position the user's earlier edit
+  -- earned in the queue.
+  if addr then
+    self:_drop_param(addr, not run)
+    if not run then
+      for _, m in ipairs(self.queue) do
+        if m.class == PARAM and m.addr == addr then
+          local payload, kind = M.encode_event(events[1])
+          m.payload, m.kind, m.dev = payload, kind, dev
+          return true
+        end
+      end
+    end
+  end
+
+  for _, e in ipairs(events) do
+    local payload, kind = M.encode_event(e)
+    self:_append({ payload }, dev, PARAM, addr, kind, run or nil)
+  end
   return true
 end
 
@@ -177,11 +273,18 @@ function M:pump()
   local t = self:now()
   if self.next_at and t < self.next_at then return false end
   table.remove(self.queue, 1)
-  self.reaper.SendMIDIMessageToHardware(m.dev, M.frame(m.payload))
+  -- Framing is per kind. A SysEx payload is carried without F0/F7 everywhere
+  -- else because that is what MIDI_InsertTextSysexEvt wants, and gets exactly
+  -- one pair here; a channel message is already complete and must go out
+  -- untouched.
+  local msg = m.kind == CHANNEL and m.payload or M.frame(m.payload)
+  self.reaper.SendMIDIMessageToHardware(m.dev, msg)
   self.next_at = t + self.interval
   return true
 end
 
 M.NO_ROUTE, M.NO_TAKE = NO_ROUTE, NO_TAKE
+M.SYSEX, M.CHANNEL = SYSEX, CHANNEL
+M.PRESET, M.PARAM = PRESET, PARAM
 
 return M

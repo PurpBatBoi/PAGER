@@ -259,3 +259,183 @@ H.pass('the device is captured per message when queued (4 cases)')
 check(take2:count() == 0 and take3:count() == 0 and take7:count() == 0,
   'the hardware queue must never write into a MIDI take')
 H.pass('hardware previews never touch the MIDI take (1 case)')
+
+-- typed events: framing per kind ------------------------------------------------
+
+-- Everything above this line predates the Part Editor and must keep passing
+-- unchanged: SysEx payloads travel without F0/F7 and are framed exactly once
+-- at the send boundary. Part previews add channel messages, which are already
+-- complete and must go out untouched -- an F0 in front of a Control Change is
+-- a different message, and the hardware would simply ignore it.
+
+-- The raw bytes of a channel message. Status nibble, zero-based channel.
+local cc_bytes = HW.channel_bytes(0xB0, 0, 74, 84)
+check(#cc_bytes == 3, 'a Control Change is three bytes, got ' .. #cc_bytes)
+check(cc_bytes:byte(1) == 0xB0, 'channel 0 Control Change status must be B0')
+check(cc_bytes:byte(2) == 74 and cc_bytes:byte(3) == 84, 'cc number then value')
+check(HW.channel_bytes(0xB0, 15, 7, 100):byte(1) == 0xBF,
+  'channel 15 must land in the low nibble')
+
+-- Two-byte messages exist too; the third byte is simply absent rather than 0.
+check(#HW.channel_bytes(0xC0, 3, 42) == 2, 'a two-byte message stays two bytes')
+
+-- encode_event turns one part_messages event into a payload and a kind.
+local pay_cc, kind_cc = HW.encode_event({ kind = 'cc', channel = 9, cc = 7, value = 100 })
+check(kind_cc == HW.CHANNEL, 'a cc event must be a channel message')
+check(pay_cc == string.char(0xB9, 7, 100), 'part 10 level must encode to B9 07 64')
+
+local pay_sx, kind_sx = HW.encode_event({ kind = 'sysex', payload = 'RAW' })
+check(kind_sx == HW.SYSEX, 'a sysex event must stay sysex')
+check(pay_sx == 'RAW', 'a sysex payload must pass through unchanged')
+
+-- A channel message goes out raw; a SysEx one goes out framed. Same queue,
+-- same pump, different boundary treatment.
+local q13, take13, clock13 = rig()
+q13:preview_events({ { kind = 'cc', channel = 0, cc = 74, value = 84 } }, take13, 'cutoff')
+q13:pump()
+check(#take13.sent == 1, 'the channel message must go out')
+check(take13.sent[1].msg == string.char(0xB0, 74, 84),
+  'a channel message must not be framed')
+
+q13:preview_events({ { kind = 'sysex', payload = 'SX' } }, take13, 'eq')
+clock13.t = clock13.t + HW.INTERVAL
+q13:pump()
+check(take13.sent[2].msg == string.char(0xF0) .. 'SX' .. string.char(0xF7),
+  'a sysex event must still be framed exactly once')
+H.pass('typed events: channel messages raw, SysEx framed (11 cases)')
+
+-- ordered runs -------------------------------------------------------------------
+
+-- An RPN is a run: selector, Data Entry, Null. It must reach the hardware in
+-- that order and must never be coalesced internally -- a Null arriving before
+-- its Data Entry writes nothing at all.
+local function rpn_events(value)
+  return {
+    { kind = 'cc', channel = 0, cc = 101, value = 0 },
+    { kind = 'cc', channel = 0, cc = 100, value = 0 },
+    { kind = 'cc', channel = 0, cc = 6, value = value },
+    { kind = 'cc', channel = 0, cc = 101, value = 127 },
+    { kind = 'cc', channel = 0, cc = 100, value = 127 },
+  }
+end
+
+local q14, take14, clock14 = rig()
+q14:preview_events(rpn_events(2), take14, 'bend_range')
+check(q14:pending() == 5, 'a five-message run must queue as five, got ' .. q14:pending())
+
+for _ = 1, 5 do
+  q14:pump()
+  clock14.t = clock14.t + HW.INTERVAL
+end
+check(#take14.sent == 5, 'every message of the run must go out')
+local seq = {}
+for i, s in ipairs(take14.sent) do
+  seq[i] = ('%d=%d'):format(s.msg:byte(2), s.msg:byte(3))
+end
+check(table.concat(seq, ',') == '101=0,100=0,6=2,101=127,100=127',
+  'the run must go out in order, got ' .. table.concat(seq, ','))
+H.pass('an ordered run keeps its order through the queue (3 cases)')
+
+-- The messages of a run share an addr but must not coalesce with each other:
+-- three of these five carry a repeated controller number.
+local q15, take15 = rig()
+q15:preview_events(rpn_events(2), take15, 'bend_range')
+check(q15:pending() == 5, 'a run must not coalesce within itself')
+
+-- A newer edit to the SAME parameter replaces the whole run rather than
+-- rewriting one message of it, so the queue never holds the selector of one
+-- value in front of the Data Entry of another.
+q15:preview_events(rpn_events(7), take15, 'bend_range')
+check(q15:pending() == 5, 'the run must be replaced whole, got ' .. q15:pending())
+local vals = {}
+for _, m in ipairs(q15.queue) do vals[#vals + 1] = m.payload:byte(3) end
+check(table.concat(vals, ',') == '0,0,7,127,127',
+  'only the newest run may remain, got ' .. table.concat(vals, ','))
+
+-- A different parameter's run is untouched by that replacement.
+q15:preview_events(rpn_events(1), take15, 'fine_tune')
+check(q15:pending() == 10, 'two parameters means two runs, got ' .. q15:pending())
+q15:preview_events(rpn_events(9), take15, 'bend_range')
+check(q15:pending() == 10, 'replacing one run must not disturb the other')
+H.pass('a run is replaced whole, and only its own parameter (5 cases)')
+
+-- cross-encoding replacement ----------------------------------------------------
+
+-- Use SysEx? changes the shape of a parameter's encoding, not its identity.
+-- The coalescing rule is by logical parameter, so a newer edit replaces its
+-- unsent predecessor across that change in both directions.
+
+-- run replaced by a single message
+local q16, take16 = rig()
+q16:preview_events(rpn_events(2), take16, 'bend_range')
+q16:preview_events({ { kind = 'sysex', payload = 'DT1BEND' } }, take16, 'bend_range')
+check(q16:pending() == 1, 'a run must be fully replaced by a single message, got '
+  .. q16:pending())
+check(q16.queue[1].payload == 'DT1BEND', 'the newest encoding must be what remains')
+check(q16.queue[1].kind == HW.SYSEX, 'the kind must follow the new encoding')
+
+-- single message replaced by a run
+local q17, take17 = rig()
+q17:preview_events({ { kind = 'sysex', payload = 'DT1BEND' } }, take17, 'bend_range')
+q17:preview_events(rpn_events(2), take17, 'bend_range')
+check(q17:pending() == 5, 'a single message must be fully replaced by a run, got '
+  .. q17:pending())
+for _, m in ipairs(q17.queue) do
+  check(m.kind == HW.CHANNEL, 'nothing of the old SysEx encoding may survive')
+end
+
+-- single replaced by single, in place: the position the earlier edit earned
+-- in the queue is kept, exactly as it is for the Effects Editor's payloads.
+local q18, take18 = rig()
+q18:preview_events({ { kind = 'cc', channel = 0, cc = 74, value = 10 } }, take18, 'cutoff')
+q18:preview_events({ { kind = 'cc', channel = 0, cc = 71, value = 20 } }, take18, 'resonance')
+q18:preview_events({ { kind = 'cc', channel = 0, cc = 74, value = 99 } }, take18, 'cutoff')
+check(q18:pending() == 2, 'the repeated parameter must coalesce, got ' .. q18:pending())
+check(q18.queue[1].payload:byte(3) == 99, 'the newest value must win')
+check(q18.queue[2].payload:byte(3) == 20, 'in the original position')
+H.pass('previews coalesce by logical parameter across encoding changes (9 cases)')
+
+-- A run queued behind a preset batch still waits its turn rather than jumping
+-- it, and survives that batch being replaced -- the same rule the Effects
+-- Editor's single payloads already follow.
+local q19, take19 = rig()
+q19:preview_batch({ payload('pre1'), payload('pre2') }, take19)
+q19:preview_events(rpn_events(2), take19, 'bend_range')
+check(q19:pending() == 7, 'the run must queue behind the batch')
+q19:preview_batch({ payload('newpre') }, take19)
+check(q19:pending() == 6, 'the old batch goes, the whole run stays')
+check(q19.queue[1].payload:byte(2) == 101, 'the run must keep its position and order')
+check(q19.queue[6].payload == 'newpre', 'the new batch follows it')
+H.pass('a run survives a preset batch being replaced (4 cases)')
+
+-- routing and cancellation apply to runs exactly as to single messages.
+local q20, take20 = rig({ hwout = -1 })
+local ok20, err20 = q20:preview_events(rpn_events(2), take20, 'bend_range')
+check(ok20 == false and err20 == HW.NO_ROUTE, 'a routeless run must report it')
+check(q20:pending() == 0, 'a failed run must queue nothing')
+
+local ok21, err21 = q20:preview_events({}, take20, 'bend_range')
+check(ok21 == false and err21 == HW.NO_ROUTE,
+  'an empty list must still report a missing route before succeeding')
+
+local q22, take22 = rig()
+check(q22:preview_events({}, take22, 'bend_range') == true,
+  'an empty event list with a route is a no-op, not a failure')
+check(q22:pending() == 0, 'an empty list queues nothing')
+
+local q23, take23 = rig()
+q23:preview_events(rpn_events(2), take23, 'bend_range')
+q23:cancel()
+check(q23:pending() == 0, 'cancel must drop a run like anything else')
+check(take23:count() == 0, 'previewing a run must never write MIDI events')
+H.pass('runs honour routing, empty lists and cancellation (7 cases)')
+
+-- The Effects Editor's own entry point is untouched by all of the above: its
+-- payloads still queue as SysEx and still frame at the boundary.
+local q24, take24 = rig()
+q24:preview_param(payload('legacy'), take24, 'addrA')
+check(q24.queue[1].kind == HW.SYSEX, 'preview_param must default to SysEx')
+q24:pump()
+check(take24.sent[1].msg == string.char(0xF0) .. 'legacy' .. string.char(0xF7),
+  'the existing SysEx path must still be framed')
+H.pass('the pre-existing SysEx API is unchanged (2 cases)')

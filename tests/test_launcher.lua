@@ -211,30 +211,44 @@ do
   check(table.concat(order, ' ') == table.concat(want, ' '),
     'the buttons are drawn in TOOLS order, got ' .. table.concat(order, ' '))
 
-  -- Part, Patch and Drum first, then the two that exist. The plan fixes this
-  -- order: the unwritten tools are visible but lead the row.
+  -- The plan fixes this order: the unwritten tools are visible but lead the
+  -- row, and the ones that exist follow. Which is which is read from TOOLS
+  -- rather than hardcoded, so enabling a tool is a one-line change to the
+  -- launcher instead of a change here too -- but the last two must stay put,
+  -- because those two are what the rest of this file drives.
   check(#launcher.TOOLS == 5, 'five tools, got ' .. #launcher.TOOLS)
-  for i = 1, 3 do
-    check(launcher.TOOLS[i].file == nil,
-      ('tool %d (%s) is not written yet and must have no file')
-        :format(i, launcher.TOOLS[i].label))
-  end
   check(launcher.TOOLS[4].file == 'effects_editor.lua',
     'the fourth tool is the Effects Editor')
   check(launcher.TOOLS[5].file == 'midi-export.lua',
     'the fifth tool is MIDI Export')
 
+  -- Every packaged tool names a file that exists; an unwritten one names
+  -- nothing at all. A typo'd filename would otherwise only surface as a
+  -- failed load in front of the user.
+  local unwritten = {}
+  for i, t in ipairs(launcher.TOOLS) do
+    if t.file == nil then
+      unwritten[#unwritten + 1] = t.label
+    else
+      local f = io.open(EDITOR .. t.file, 'r')
+      check(f, ('tool %d (%s) names %s, which does not exist')
+        :format(i, t.label, t.file))
+      if f then f:close() end
+    end
+  end
+
   -- Disabled through BeginDisabled, not gray text: a drawn-gray button still
-  -- takes the click. Exactly the three without a file.
+  -- takes the click. Exactly the ones without a file, in their row order.
   local disabled = {}
   for _, b in ipairs(st.buttons) do
     if b.disabled then disabled[#disabled + 1] = b.label end
   end
-  check(#disabled == 3, 'three buttons are disabled, got ' .. #disabled)
-  for i = 1, 3 do
-    check(disabled[i] == launcher.TOOLS[i].label,
+  check(#disabled == #unwritten,
+    ('%d buttons must be disabled, got %d'):format(#unwritten, #disabled))
+  for i, label in ipairs(unwritten) do
+    check(disabled[i] == label,
       ('the disabled buttons are the unwritten tools; expected %s, got %s')
-        :format(launcher.TOOLS[i].label, tostring(disabled[i])))
+        :format(label, tostring(disabled[i])))
   end
   check(st.disable_depth == 0, 'every BeginDisabled is matched by EndDisabled')
 

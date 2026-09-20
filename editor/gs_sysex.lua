@@ -66,6 +66,33 @@ end
 local function part_efx_addr(part) return part_addr(part, 0x22) end
 local function part_eq_addr(part)  return part_addr(part, 0x20) end
 
+-- The Part Editor reaches two more address families on the same block nibble.
+-- 40 1x is the Patch Part block -- level, pan, the tone modifiers, tuning --
+-- and 40 2x is the Part's bend block. Both are port-local: the same bytes
+-- sent through hardware Port B address Group B, so nothing here encodes a
+-- group (manual p.237). part_addr is not reused because it hard-codes the
+-- 0x40 switch block in its middle byte.
+local function part_block(part)
+  local block = PART_BLOCK[part]
+  assert(block and block >= 0 and block <= 0xF, 'invalid SC-8850 part block')
+  return block
+end
+
+local function part_param_addr(part, lo)
+  return { 0x40, 0x10 + part_block(part), lo }
+end
+
+local function part_bend_addr(part, lo)
+  return { 0x40, 0x20 + part_block(part), lo }
+end
+
+assert(part_param_addr(1, 0x19)[2] == 0x11, 'part 1 level must use block 1')
+assert(part_param_addr(10, 0x19)[2] == 0x10, 'part 10 must use block 0')
+assert(part_param_addr(16, 0x19)[2] == 0x1F, 'part 16 must use block F')
+assert(part_bend_addr(1, 0x10)[2] == 0x21, 'part 1 bend must use block 1')
+assert(part_bend_addr(10, 0x10)[2] == 0x20, 'part 10 bend must use block 0')
+assert(part_bend_addr(16, 0x10)[2] == 0x2F, 'part 16 bend must use block F')
+
 assert(part_efx_addr(10)[2] == 0x40, 'part 10 must use block 0')
 assert(part_efx_addr(16)[2] == 0x4F, 'part 16 must use block F')
 assert(part_eq_addr(3)[2] == 0x43, 'part 3 EQ must use block 3')
@@ -89,6 +116,27 @@ assert(eq_on_payload(1, false) ==
        'part 1 EQ OFF must match the hardware capture')
 assert(checksum({ 0x40, 0x02, 0x01, 0x46 }) == 0x77, 'manual p.87 example')
 
+-- The three address bytes of a DT1 payload, or nil when the payload is not
+-- one. is_dt1_at answers "is this that address"; this answers "which address
+-- is this", which is what the Part Editor needs to recognise its own previous
+-- write at a tick without knowing in advance which parameter put it there.
+-- Payloads exclude F0/F7 here, exactly as take events store them.
+local function dt1_addr_of(msg)
+  if type(msg) ~= 'string' or #msg < 8 then return nil end
+  if msg:byte(1) ~= ROLAND_ID or msg:byte(3) ~= MODEL_GS then return nil end
+  if msg:byte(4) ~= CMD_DT1 then return nil end
+  return { msg:byte(5), msg:byte(6), msg:byte(7) }
+end
+
+do
+  local a = dt1_addr_of(eq_on_payload(1, true))
+  assert(a and a[1] == 0x40 and a[2] == 0x41 and a[3] == 0x20,
+         'dt1_addr_of must read back the address eq_on_payload wrote')
+end
+assert(dt1_addr_of('short') == nil, 'dt1_addr_of must reject a short payload')
+assert(dt1_addr_of(master_volume(64)) == nil,
+       'dt1_addr_of must reject a universal-SysEx payload')
+
 return {
   DEV = DEV, ROLAND_ID = ROLAND_ID, MODEL_GS = MODEL_GS, CMD_DT1 = CMD_DT1,
   GS_RESET = GS_RESET, PART_BLOCK = PART_BLOCK,
@@ -96,5 +144,7 @@ return {
   master_volume = master_volume, master_tune = master_tune,
   hz_to_cents_x10 = hz_to_cents_x10,
   part_addr = part_addr, part_efx_addr = part_efx_addr,
-  part_eq_addr = part_eq_addr,
+  part_eq_addr = part_eq_addr, part_block = part_block,
+  part_param_addr = part_param_addr, part_bend_addr = part_bend_addr,
+  dt1_addr_of = dt1_addr_of,
 }
