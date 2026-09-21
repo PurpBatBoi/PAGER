@@ -168,6 +168,17 @@ ins9:insert(take9, 'cutoff', -30, 1, false)     -- now as a CC
 check(#take9.events == 0, 'the old SysEx form must be removed, got ' .. #take9.events)
 check(#take9.ccs == 1, 'the new CC form must be present')
 
+-- Mono/Poly writes a DIFFERENT controller per value: Mono is CC126 and Poly
+-- CC127. Switching must still replace, not leave both in the take.
+local ins_mp, take_mp = rig({ cursor = 1000 })
+ins_mp:insert(take_mp, 'mono_poly', 0, 1, false)   -- Mono, CC126
+ins_mp:insert(take_mp, 'mono_poly', 1, 1, false)   -- Poly, CC127
+check(#take_mp.ccs == 1 and take_mp.ccs[1].msg2 == 127,
+  'Poly must replace Mono, got ' .. #take_mp.ccs .. ' CCs')
+ins_mp:insert(take_mp, 'mono_poly', 0, 1, true)    -- Mono as SysEx
+check(#take_mp.ccs == 0 and #take_mp.events == 1,
+  'the SysEx form must replace the CC form')
+
 -- Bend Range is the sharpest case: a five-message RPN run on one side and a
 -- single DT1 write on the other.
 local ins10, take10 = rig({ cursor = 1000 })
@@ -433,3 +444,145 @@ local ins27, take27 = rig({ cursor = 1000 })
 ins27:insert(take27, 'cutoff', 20, 1, true)
 check(#labels(take27) == 0, 'no displayed value means no label')
 H.pass('inserts are labelled, and labels replace as targetedly as events (16 cases)')
+
+-- voices ---------------------------------------------------------------------
+
+-- A voice selection written into the take.
+--
+-- Three messages, and all three are CC events: REAPER's Bank/Program Select
+-- lane is a VIEW that displays CC0, CC32 and a Program Change together, not
+-- an event type of its own. The PC carries a 0xC0 status rather than 0xB0,
+-- which is what puts it in that lane -- written as a raw event instead it
+-- would hold the same bytes and not appear there.
+do
+  local ins, take = rig({ cursor = 1000, ppq_per_qn = 960 })
+  local ok, err = ins:insert_voice(take, 7, 0, 4, 12, 'Vibraphone')
+  check(ok, 'the voice must insert: ' .. tostring(err))
+
+  check(#take.ccs == 3,
+    'a voice is three CC-lane events, got ' .. #take.ccs)
+
+  -- In order, one gap apart. The Program Change must come last: the hardware
+  -- latches Bank Select and applies it when the PC arrives, so a PC ahead of
+  -- its bank bytes selects out of whichever bank was last set.
+  local gap = ins:gap(take)
+  local want = {
+    { 1000,           PI.CC_STATUS, 0,  0 },   -- CC0  Bank Select MSB
+    { 1000 + gap,     PI.CC_STATUS, 32, 4 },   -- CC32 Bank Select LSB
+    { 1000 + gap * 2, PI.PC_STATUS, 12, 0 },   -- Program Change
+  }
+  for i, w in ipairs(want) do
+    local c = take.ccs[i]
+    check(c.ppq == w[1] and c.chanmsg == w[2] and c.msg2 == w[3]
+          and c.msg3 == w[4],
+      ('event %d must be @%d status 0x%02X %d=%d, got @%s status 0x%02X %s=%s')
+        :format(i, w[1], w[2], w[3], w[4], tostring(c.ppq), c.chanmsg,
+                tostring(c.msg2), tostring(c.msg3)))
+    check(c.chan == 6, 'Part 7 is channel 6, got ' .. tostring(c.chan))
+  end
+
+  -- One readable label, naming the Part and the voice.
+  local labelled = false
+  for _, e in ipairs(take.events) do
+    if e.typ == PI.LABEL and e.payload == 'Part 7 Voice Vibraphone' then
+      labelled = true
+    end
+  end
+  check(labelled, 'the insert must be labelled with its Part and voice')
+
+  check(take.sorted > 0, 'the take must be sorted once written')
+  H.pass('a voice writes bank select and program change to the CC lane (11 cases)')
+end
+
+-- Re-selecting a voice replaces the previous one rather than stacking.
+--
+-- Without this a Part would accumulate bank bytes at one tick, and the
+-- hardware would act on whichever the sort happened to leave last.
+do
+  local ins, take = rig({ cursor = 1000, ppq_per_qn = 960 })
+  check(ins:insert_voice(take, 7, 0, 4, 12, 'Vibraphone'))
+  check(ins:insert_voice(take, 7, 0, 1, 3, 'Honky-tonk'))
+
+  check(#take.ccs == 3,
+    'the second voice must replace the first, got ' .. #take.ccs .. ' events')
+
+  -- The surviving events are the SECOND selection: SC-55 map, PC 3.
+  check(take.ccs[2].msg3 == 1, 'the new map LSB must survive, got ' ..
+    tostring(take.ccs[2].msg3))
+  check(take.ccs[3].msg2 == 3, 'and the new program, got ' ..
+    tostring(take.ccs[3].msg2))
+
+  -- One label, not two stacked at the same tick.
+  local labels = 0
+  for _, e in ipairs(take.events) do
+    if e.typ == PI.LABEL then labels = labels + 1 end
+  end
+  check(labels == 1, 'exactly one voice label survives, got ' .. labels)
+
+  -- Another Part's voice is untouched by this one's replacement.
+  local ins2, take2 = rig({ cursor = 1000 })
+  check(ins2:insert_voice(take2, 1, 0, 4, 0, 'Piano 1'))
+  check(ins2:insert_voice(take2, 2, 0, 4, 1, 'Piano 2'))
+  check(#take2.ccs == 6, 'two Parts keep six events, got ' .. #take2.ccs)
+
+  H.pass('re-selecting a voice replaces its own Part only (7 cases)')
+end
+
+-- tick collisions --------------------------------------------------------------
+
+-- Two different parameters inserted at one cursor must not share a tick.
+--
+-- The SC-8850 acts on messages in arrival order. Two writes at one instant
+-- leave that order to whatever the sort happened to do, so the value that
+-- takes effect is not necessarily the one chosen last -- a wrong result that
+-- looks like the editor simply ignored an edit.
+do
+  local ins, take = rig({ cursor = 1000, ppq_per_qn = 960 })
+  check(ins:insert(take, 'cutoff', 20, 1, true, '+20'))
+  check(ins:insert(take, 'resonance', 30, 1, true, '+30'))
+  check(ins:insert(take, 'rhythm', 2, 9, true, 'DRUM 2'))
+
+  -- Every VALUE sits on a tick of its own. Labels are excluded: a label
+  -- deliberately shares the tick of the event it describes, which is what
+  -- makes it readable in the editor as a marker on that event.
+  local seen = {}
+  for _, e in ipairs(take.events) do
+    if e.typ ~= PI.LABEL then
+      check(not seen[e.ppq],
+        ('two events share tick %d'):format(e.ppq))
+      seen[e.ppq] = true
+    end
+  end
+  for _, c in ipairs(take.ccs) do
+    check(not seen[c.ppq],
+      ('a CC shares tick %d with another event'):format(c.ppq))
+    seen[c.ppq] = true
+  end
+
+  H.pass('separate inserts at one cursor never share a tick')
+end
+
+-- Re-inserting the SAME parameter still replaces in place rather than
+-- marching away from the cursor. Sliding off its own previous copy would
+-- leave the take growing a new event for every edit.
+do
+  local ins, take = rig({ cursor = 1000, ppq_per_qn = 960 })
+  check(ins:insert(take, 'cutoff', 20, 1, true, '+20'))
+  local first = take.events[1].ppq
+
+  check(ins:insert(take, 'cutoff', 30, 1, true, '+30'))
+  check(ins:insert(take, 'cutoff', 40, 1, true, '+40'))
+
+  -- One value event and one label, still at the tick it started on.
+  local values = 0
+  for _, e in ipairs(take.events) do
+    if e.typ == PI.SYSEX then values = values + 1 end
+  end
+  check(values == 1,
+    'replacing must not accumulate events, got ' .. values)
+  check(take.events[1].ppq == first,
+    ('a replacement must stay put: was %d, now %d')
+      :format(first, take.events[1].ppq))
+
+  H.pass('a replacement stays on its own tick (3 cases)')
+end

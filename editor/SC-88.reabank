@@ -1,0 +1,723 @@
+; SC-88 map - instrument definitions for REAPER
+
+Bank 0 2 Capital-Tones [SC88]
+0 Piano 1
+1 Piano 2
+2 Piano 3
+3 Honky-tonk
+4 E.Piano 1
+5 E.Piano 2
+6 Harpsichord
+7 Clav.
+8 Celesta
+9 Glocknspiel
+10 Music Box
+11 Vibraphone
+12 Marimba
+13 Xylophone
+14 Tubularbell
+15 Santur
+16 Organ 1
+17 Organ 2
+18 Organ 3
+19 ChurchOrg.1
+20 Reed Organ
+21 AccordionFr
+22 Harmonica
+23 Bandoneon
+24 Nylonstr.Gt
+25 Steelstr.Gt
+26 Jazz Gt.
+27 Clean Gt.
+28 Muted Gt.
+29 OverdriveGt
+30 DistortionGt
+31 Gt.Harmonix
+32 AcousticBs.
+33 FingeredBs.
+34 Picked Bass
+35 FretlessBs.
+36 Slap Bass 1
+37 Slap Bass 2
+38 SynthBass 1
+39 SynthBass 2
+40 Violin
+41 Viola
+42 Cello
+43 Contrabass
+44 Tremolo Str
+45 Pizz. Str.
+46 Harp
+47 Timpani
+48 Strings
+49 SlowStrings
+50 SynStrings1
+51 SynStrings2
+52 Choir Aahs
+53 Voice Oohs
+54 SynVox
+55 Orch. Hit
+56 Trumpet
+57 Trombone
+58 Tuba
+59 Muted Tp.
+60 FrenchHorns
+61 Brass 1
+62 SynthBrass1
+63 Syn.Brass 2
+64 Soprano Sax
+65 Alto Sax
+66 Tenor Sax
+67 BaritoneSax
+68 Oboe
+69 EnglishHorn
+70 Bassoon
+71 Clarinet
+72 Piccolo
+73 Flute
+74 Recorder
+75 Pan Flute
+76 Bottle Blow
+77 Shakuhachi
+78 Whistle
+79 Ocarina
+80 Square Wave
+81 Saw Wave
+82 SynCalliope
+83 ChifferLead
+84 Charang
+85 Solo Vox
+86 5th Saw
+87 Bass & Lead
+88 Fantasia
+89 Warm Pad
+90 Polysynth
+91 Space Voice
+92 Bowed Glass
+93 Metal Pad
+94 Halo Pad
+95 Sweep Pad
+96 Ice Rain
+97 Soundtrack
+98 Crystal
+99 Atmosphere
+100 Brightness
+101 Goblin
+102 Echo Drops
+103 Star Theme
+104 Sitar
+105 Banjo
+106 Shamisen
+107 Koto
+108 Kalimba
+109 Bagpipe
+110 Fiddle
+111 Shanai
+112 Tinkle Bell
+113 Agogo
+114 Steel Drums
+115 Woodblock
+116 Taiko
+117 Melo. Tom 1
+118 Synth Drum
+119 Reverse Cym
+120 Gt.FretNoiz
+121 BreathNoise
+122 Seashore
+123 Bird
+124 Telephone 1
+125 Helicopter
+126 Applause
+127 Gun Shot
+
+Bank 1 2 Varitation-01 [SC88]
+2 EG+Rhodes 1
+11 Hard Vibe
+15 Santur 2
+16 Organ 101
+17 Organ 201
+22 Harmonica 2
+26 Mellow Gt.
+28 MutedDis.Gt
+30 Dist. Gt2
+33 FingeredBs2
+35 FretlessBs2
+38 Syn.Bass101
+39 Syn.Bass201
+48 Strings 2
+49 Slow Str. 2
+50 OB Strings
+56 Trumpet 2
+57 Trombone 2
+58 Tuba 2
+60 Fr.Horn 2
+62 Poly Brass
+63 Soft Brass
+80 Square
+81 Saw
+82 Vent Synth
+86 Big Fives
+87 Big & Raw
+88 Fantasia 2
+89 Thick Pad
+90 80'sPolySyn
+91 Heaven II
+93 Tine Pad
+95 Polar Pad
+96 Harmo Rain
+97 Ancestral
+98 Syn Mallet
+99 Warm Atmos
+101 Goblinson
+102 Echo Bell
+103 StarTheme 2
+104 Sitar 2
+105 Muted Banjo
+106 Tsugaru
+111 Shanai 2
+117 Real Tom
+119 ReverseCym2
+120 Gt.CutNoise
+121 Fl.KeyClick
+122 Rain
+123 Dog
+124 Telephone 2
+125 Car-Engine
+126 Laughing
+127 Machine Gun
+
+Bank 2 2 Varitation-02 [SC88]
+2 EG+Rhodes 2
+30 DazedGuitar
+33 Jazz Bass
+35 FretlessBs3
+39 ModularBass
+80 Hollow Mini
+81 Pulse Saw
+82 PurePanLead
+87 Fat & Perky
+89 Horn Pad
+93 Panner Pad
+96 AfricanWood
+97 Prologue
+98 SoftCrystal
+99 Nylon Harp
+101 50's Sci-Fi
+102 Echo Pan
+104 DetuneSitar
+120 String Slap
+122 Thunder
+123 HorseGallop
+124 Creaking
+125 Car-Stop
+126 Screaming
+127 Lasergun
+
+Bank 3 2 Varitation-03 [SC88]
+35 FretlessBs4
+39 Seq Bass
+80 Mellow FM
+81 Feline GR
+89 RotaryStrng
+98 Round Glock
+99 Harpvox
+102 Echo Pan 2
+120 Gt.CutNz. 2
+122 Wind
+123 Bird 2
+124 Door
+125 Car-Pass
+126 Punch
+127 Explosion
+
+Bank 4 2 Varitation-04 [SC88]
+35 SynFretless
+80 CC Solo
+81 Big Lead
+89 Soft Pad
+98 Loud Glock
+99 HollowRels.
+102 Big Panner
+120 Dist.CutNz.
+122 Stream
+123 Kitty
+124 Scratch
+125 Car-Crash
+126 Heart Beat
+
+Bank 5 2 Varitation-05 [SC88]
+35 Mr.Smooth
+80 Shmoog
+81 Velo Lead
+98 GlocknChime
+99 NylonRhodes
+102 Reso Panner
+120 Bass Slide
+122 Bubble
+123 Growl
+124 Wind Chimes
+125 Siren
+126 Footsteps
+
+Bank 6 2 Varitation-06 [SC88]
+80 LM Square
+81 GR-300
+98 Clear Bells
+99 Ambient Pad
+102 Water Piano
+120 Pick Scrape
+125 Train
+126 Applause 2
+
+Bank 7 2 Varitation-07 [SC88]
+81 LA Saw
+98 X'mas Bell
+124 Scratch 2
+125 Jetplane
+
+Bank 8 2 Varitation-08 [SC88]
+0 Piano 1w
+1 Piano 2w
+2 Piano 3w
+3 Old Upright
+4 St.Soft EP
+5 Detuned EP2
+6 Coupled Hps
+11 Vib.w
+12 Marimba w
+14 Church Bell
+15 Cimbalom
+16 DetunedOr.1
+17 DetunedOr.2
+18 Rotary Org.
+19 ChurchOrg.2
+21 AccordionIt
+24 Ukulele
+25 12-str.Gt
+26 Pedal Steel
+27 Chorus Gt.
+28 Funk Pop
+30 FeedbackGt.
+31 Gt.Feedback
+34 MutePickBs.
+36 Reso Slap
+38 Acid Bass
+39 Beef FMBass
+40 Slow Violin
+44 SlowTremolo
+48 Orchestra
+49 Legato Str.
+50 SynStrings3
+52 St.Choir
+54 Syn.Voice
+55 Impact Hit
+56 Flugel Horn
+60 Fr.HornSolo
+61 Brass 2
+62 Syn.Brass 3
+63 Syn.Brass 4
+65 Hyper Alto
+66 BreathyTnr.
+71 Bs Clarinet
+75 Kawala
+80 Sine Wave
+81 Doctor Solo
+84 Dist.Lead
+95 Converge
+96 Clavi Pad
+97 Rave
+98 Vibra Bells
+104 Tambra
+105 Rabab
+107 Taisho Koto
+111 Pungi
+112 Bonang
+113 Atarigane
+115 Castanets
+116 Concert BD
+117 Melo. Tom 2
+118 808 Tom
+119 Rev.Snare 1
+125 Starship
+
+Bank 9 2 Varitation-09 [SC88]
+14 Carillon
+16 Organ 109
+25 Nylon+Steel
+30 FeedbackGt2
+38 TB303 Bass
+39 X Wire Bass
+44 SuspenseStr
+48 Orchestra 2
+49 WarmStrings
+52 Mello Choir
+55 Philly Hit
+62 Quack Brass
+95 Shwimmer
+98 Digi Bells
+112 Gender
+117 Rock Tom
+118 Elec Perc
+119 Rev.Snare 2
+125 Burst Noise
+
+Bank 10 2 Varitation-10 [SC88]
+38 Tekno Bass
+48 TremoloOrch
+49 St.SlowStr.
+55 Double Hit
+95 CelestialPd
+112 GamelanGong
+
+Bank 11 2 Varitation-11 [SC88]
+48 Choir Str.
+112 St.Gamelan
+
+Bank 16 2 Varitation-16 [SC88]
+0 Piano 1d
+4 FM+SA EP
+5 St.FM EP
+6 Harpsi.w
+12 Barafon
+16 60'sOrgan 1
+18 RotaryOrg.S
+19 ChurchOrg.3
+24 Nylon Gt.o
+25 Mandolin
+28 Funk Gt.2
+30 PowerGuitar
+31 Ac.Gt.Harm.
+38 Reso SHBass
+39 Rubber Bass
+48 St.Strings
+55 Lo Fi Rave
+60 Horn Orch
+61 Brass Fall
+62 OctaveBrass
+63 VeloBrass 1
+81 Waspy Synth
+98 ChoralBells
+104 Tamboura
+105 Gopichant
+107 Kanoon
+111 Hichiriki
+112 RAMA Cymbal
+119 Rev.Kick 1
+
+Bank 17 2 Varitation-17 [SC88]
+12 Barafon 2
+16 60'sOrgan 2
+30 Power Gt.2
+39 SH101Bass 1
+63 VeloBrass 2
+98 Air Bells
+119 Rev.ConBD
+
+Bank 18 2 Varitation-18 [SC88]
+16 60'sOrgan 3
+30 5th Dist.
+39 SH101Bass 2
+98 Bell Harp
+
+Bank 19 2 Varitation-19 [SC88]
+39 Smooth Bass
+98 Gamelimba
+
+Bank 24 2 Varitation-24 [SC88]
+4 60'sE.Piano
+5 Hard FM EP
+6 Harpsi.o
+12 Log drum
+16 CheeseOrgan
+18 RotaryOrg.F
+19 Organ Flute
+24 VeloHarmnix
+30 Rock Rhythm
+48 VeloStrings
+56 Bright Tp.
+105 Oud
+119 Rev.Tom 1
+
+Bank 25 2 Varitation-25 [SC88]
+4 Hard Rhodes
+30 RockRhythm2
+56 Warm Tp.
+119 Rev.Tom 2
+
+Bank 26 2 Varitation-26 [SC88]
+4 MellwRhodes
+
+Bank 32 2 Varitation-32 [SC88]
+16 Organ 4
+17 Organ 5
+19 Trem.Flute
+24 Nylon Gt.2
+25 Steel Gt.2
+52 ChoirAahs 2
+
+Bank 33 2 Varitation-33 [SC88]
+16 Even Bar
+
+Bank 40 2 Varitation-40 [SC88]
+16 Organ Bass
+24 Lequint Gt.
+
+Bank 64 2 User-Instruments-1 [SC88]
+0 User Inst 001
+1 User Inst 002
+2 User Inst 003
+3 User Inst 004
+4 User Inst 005
+5 User Inst 006
+6 User Inst 007
+7 User Inst 008
+8 User Inst 009
+9 User Inst 010
+10 User Inst 011
+11 User Inst 012
+12 User Inst 013
+13 User Inst 014
+14 User Inst 015
+15 User Inst 016
+16 User Inst 017
+17 User Inst 018
+18 User Inst 019
+19 User Inst 020
+20 User Inst 021
+21 User Inst 022
+22 User Inst 023
+23 User Inst 024
+24 User Inst 025
+25 User Inst 026
+26 User Inst 027
+27 User Inst 028
+28 User Inst 029
+29 User Inst 030
+30 User Inst 031
+31 User Inst 032
+32 User Inst 033
+33 User Inst 034
+34 User Inst 035
+35 User Inst 036
+36 User Inst 037
+37 User Inst 038
+38 User Inst 039
+39 User Inst 040
+40 User Inst 041
+41 User Inst 042
+42 User Inst 043
+43 User Inst 044
+44 User Inst 045
+45 User Inst 046
+46 User Inst 047
+47 User Inst 048
+48 User Inst 049
+49 User Inst 050
+50 User Inst 051
+51 User Inst 052
+52 User Inst 053
+53 User Inst 054
+54 User Inst 055
+55 User Inst 056
+56 User Inst 057
+57 User Inst 058
+58 User Inst 059
+59 User Inst 060
+60 User Inst 061
+61 User Inst 062
+62 User Inst 063
+63 User Inst 064
+64 User Inst 065
+65 User Inst 066
+66 User Inst 067
+67 User Inst 068
+68 User Inst 069
+69 User Inst 070
+70 User Inst 071
+71 User Inst 072
+72 User Inst 073
+73 User Inst 074
+74 User Inst 075
+75 User Inst 076
+76 User Inst 077
+77 User Inst 078
+78 User Inst 079
+79 User Inst 080
+80 User Inst 081
+81 User Inst 082
+82 User Inst 083
+83 User Inst 084
+84 User Inst 085
+85 User Inst 086
+86 User Inst 087
+87 User Inst 088
+88 User Inst 089
+89 User Inst 090
+90 User Inst 091
+91 User Inst 092
+92 User Inst 093
+93 User Inst 094
+94 User Inst 095
+95 User Inst 096
+96 User Inst 097
+97 User Inst 098
+98 User Inst 099
+99 User Inst 100
+100 User Inst 101
+101 User Inst 102
+102 User Inst 103
+103 User Inst 104
+104 User Inst 105
+105 User Inst 106
+106 User Inst 107
+107 User Inst 108
+108 User Inst 109
+109 User Inst 110
+110 User Inst 111
+111 User Inst 112
+112 User Inst 113
+113 User Inst 114
+114 User Inst 115
+115 User Inst 116
+116 User Inst 117
+117 User Inst 118
+118 User Inst 119
+119 User Inst 120
+120 User Inst 121
+121 User Inst 122
+122 User Inst 123
+123 User Inst 124
+124 User Inst 125
+125 User Inst 126
+126 User Inst 127
+127 User Inst 128
+
+Bank 65 2 User-Instruments-2 [SC88]
+0 User Inst 129
+1 User Inst 130
+2 User Inst 131
+3 User Inst 132
+4 User Inst 133
+5 User Inst 134
+6 User Inst 135
+7 User Inst 136
+8 User Inst 137
+9 User Inst 138
+10 User Inst 139
+11 User Inst 140
+12 User Inst 141
+13 User Inst 142
+14 User Inst 143
+15 User Inst 144
+16 User Inst 145
+17 User Inst 146
+18 User Inst 147
+19 User Inst 148
+20 User Inst 149
+21 User Inst 150
+22 User Inst 151
+23 User Inst 152
+24 User Inst 153
+25 User Inst 154
+26 User Inst 155
+27 User Inst 156
+28 User Inst 157
+29 User Inst 158
+30 User Inst 159
+31 User Inst 160
+32 User Inst 161
+33 User Inst 162
+34 User Inst 163
+35 User Inst 164
+36 User Inst 165
+37 User Inst 166
+38 User Inst 167
+39 User Inst 168
+40 User Inst 169
+41 User Inst 170
+42 User Inst 171
+43 User Inst 172
+44 User Inst 173
+45 User Inst 174
+46 User Inst 175
+47 User Inst 176
+48 User Inst 177
+49 User Inst 178
+50 User Inst 179
+51 User Inst 180
+52 User Inst 181
+53 User Inst 182
+54 User Inst 183
+55 User Inst 184
+56 User Inst 185
+57 User Inst 186
+58 User Inst 187
+59 User Inst 188
+60 User Inst 189
+61 User Inst 190
+62 User Inst 191
+63 User Inst 192
+64 User Inst 193
+65 User Inst 194
+66 User Inst 195
+67 User Inst 196
+68 User Inst 197
+69 User Inst 198
+70 User Inst 199
+71 User Inst 200
+72 User Inst 201
+73 User Inst 202
+74 User Inst 203
+75 User Inst 204
+76 User Inst 205
+77 User Inst 206
+78 User Inst 207
+79 User Inst 208
+80 User Inst 209
+81 User Inst 210
+82 User Inst 211
+83 User Inst 212
+84 User Inst 213
+85 User Inst 214
+86 User Inst 215
+87 User Inst 216
+88 User Inst 217
+89 User Inst 218
+90 User Inst 219
+91 User Inst 220
+92 User Inst 221
+93 User Inst 222
+94 User Inst 223
+95 User Inst 224
+96 User Inst 225
+97 User Inst 226
+98 User Inst 227
+99 User Inst 228
+100 User Inst 229
+101 User Inst 230
+102 User Inst 231
+103 User Inst 232
+104 User Inst 233
+105 User Inst 234
+106 User Inst 235
+107 User Inst 236
+108 User Inst 237
+109 User Inst 238
+110 User Inst 239
+111 User Inst 240
+112 User Inst 241
+113 User Inst 242
+114 User Inst 243
+115 User Inst 244
+116 User Inst 245
+117 User Inst 246
+118 User Inst 247
+119 User Inst 248
+120 User Inst 249
+121 User Inst 250
+122 User Inst 251
+123 User Inst 252
+124 User Inst 253
+125 User Inst 254
+126 User Inst 255
+127 User Inst 256

@@ -123,19 +123,100 @@ local EXPECT = {
   { 'vib_depth',     'Vibrato',                -64,    63,    0, 'cc',  77,  0x31 },
   { 'vib_delay',     'Vibrato',                -64,    63,    0, 'cc',  78,  0x37 },
   { 'eq',            'Switches and Performance', 0,     1,    1, 'dt1', nil, 0x20 },
+  -- p.240: OUTPUT ASSIGN 40 4x 21, 00..03 = OUTPUT-1/2/2L/2R, default 00.
+  { 'output',        'Switches and Performance', 0,     3,    0, 'dt1', nil, 0x21 },
   { 'porta',         'Switches and Performance', 0,     1,    0, 'cc',  65,  nil  },
   { 'porta_time',    'Switches and Performance', 0,   127,    0, 'cc',   5,  nil  },
+  -- p.238: 40 1x 13, 00 = Mono, 01 = Poly, default Poly. CC127 is Poly;
+  -- the CC126 Mono form is pinned separately below.
+  { 'mono_poly',     'Switches and Performance', 0,     1,    1, 'cc', 127, 0x13 },
+  { 'rhythm',        'Switches and Performance', 0,      2,   0, 'dt1', nil, 0x15 },
   { 'pitch_key',     'Switches and Performance', -24,   24,   0, 'dt1', nil, 0x16 },
   { 'bend_range',    'Switches and Performance', 0,     24,   2, 'rpn',   0, 0x10 },
+  -- pp.237-238. Rx Channel is 1..16 plus 17 = Off; its default is per Part.
+  { 'rx_channel',    'Keyboard',                 1,     17,   1, 'dt1', nil, 0x02 },
+  { 'assign_mode',   'Keyboard',                 0,      2,   1, 'dt1', nil, 0x14 },
+  { 'vel_depth',     'Keyboard',                 0,    127,  64, 'dt1', nil, 0x1A },
+  { 'vel_offset',    'Keyboard',                 0,    127,  64, 'dt1', nil, 0x1B },
+  { 'key_low',       'Keyboard',                 0,    127,   0, 'dt1', nil, 0x1D },
+  { 'key_high',      'Keyboard',                 0,    127, 127, 'dt1', nil, 0x1E },
+  -- pp.237-238: the receive switches. All ON except Rx NRPN (00, ON only
+  -- after a GS Reset).
+  { 'rx_bend',       'Receive',                  0,      1,   1, 'dt1', nil, 0x03 },
+  { 'rx_caf',        'Receive',                  0,      1,   1, 'dt1', nil, 0x04 },
+  { 'rx_pc',         'Receive',                  0,      1,   1, 'dt1', nil, 0x05 },
+  { 'rx_cc',         'Receive',                  0,      1,   1, 'dt1', nil, 0x06 },
+  { 'rx_paf',        'Receive',                  0,      1,   1, 'dt1', nil, 0x07 },
+  { 'rx_note',       'Receive',                  0,      1,   1, 'dt1', nil, 0x08 },
+  { 'rx_rpn',        'Receive',                  0,      1,   1, 'dt1', nil, 0x09 },
+  { 'rx_nrpn',       'Receive',                  0,      1,   0, 'dt1', nil, 0x0A },
+  { 'rx_mod',        'Receive',                  0,      1,   1, 'dt1', nil, 0x0B },
+  { 'rx_volume',     'Receive',                  0,      1,   1, 'dt1', nil, 0x0C },
+  { 'rx_pan',        'Receive',                  0,      1,   1, 'dt1', nil, 0x0D },
+  { 'rx_expression', 'Receive',                  0,      1,   1, 'dt1', nil, 0x0E },
+  { 'rx_hold1',      'Receive',                  0,      1,   1, 'dt1', nil, 0x0F },
+  { 'rx_porta',      'Receive',                  0,      1,   1, 'dt1', nil, 0x10 },
+  { 'rx_sostenuto',  'Receive',                  0,      1,   1, 'dt1', nil, 0x11 },
+  { 'rx_soft',       'Receive',                  0,      1,   1, 'dt1', nil, 0x12 },
+  { 'rx_bank',       'Receive',                  0,      1,   1, 'dt1', nil, 0x23 },
+  { 'rx_bank_lsb',   'Receive',                  0,      1,   1, 'dt1', nil, 0x24 },
+  -- p.238: SCALE TUNING C..B at 40 1x 40..4B.
+  { 'scale_c',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x40 },
+  { 'scale_cs',      'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x41 },
+  { 'scale_d',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x42 },
+  { 'scale_ds',      'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x43 },
+  { 'scale_e',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x44 },
+  { 'scale_f',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x45 },
+  { 'scale_fs',      'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x46 },
+  { 'scale_g',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x47 },
+  { 'scale_gs',      'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x48 },
+  { 'scale_a',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x49 },
+  { 'scale_as',      'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x4A },
+  { 'scale_b',       'Scale Tuning',           -64,     63,   0, 'dt1', nil, 0x4B },
 }
+
+-- The 40 2x controller block, pp.239-240: each source has eleven fields at
+-- the same offsets. Bend's Pitch Control (40 2x 10) is bend_range above.
+local SOURCES = {
+  { 'mod', 'Mod Wheel', 0x00 }, { 'bend', 'Pitch Bend', 0x10 },
+  { 'caf', 'Channel Aftertouch', 0x20 }, { 'paf', 'Poly Aftertouch', 0x30 },
+  -- CC1/CC2 also carry their controller number at 40 1x 1F / 20, CC#0..95,
+  -- default 16 / 17 (p.238), listed first in their group.
+  { 'cc1', 'CC1', 0x40, 0x1F, 16 }, { 'cc2', 'CC2', 0x50, 0x20, 17 },
+}
+local FIELDS = {   -- offset, id suffix, min, max, default
+  { 0x0, 'pitch', -24, 24, 0 }, { 0x1, 'cutoff', -64, 63, 0 },
+  { 0x2, 'amp', -64, 63, 0 }, { 0x3, 'lfo1_rate', -64, 63, 0 },
+  { 0x4, 'lfo1_pitch', 0, 127, 0 }, { 0x5, 'lfo1_tvf', 0, 127, 0 },
+  { 0x6, 'lfo1_tva', 0, 127, 0 }, { 0x7, 'lfo2_rate', -64, 63, 0 },
+  { 0x8, 'lfo2_pitch', 0, 127, 0 }, { 0x9, 'lfo2_tvf', 0, 127, 0 },
+  { 0xA, 'lfo2_tva', 0, 127, 0 },
+}
+for _, s in ipairs(SOURCES) do
+  if s[4] then
+    EXPECT[#EXPECT + 1] = { s[1] .. '_number', s[2], 0, 95, s[5], 'dt1', nil, s[4] }
+  end
+  for _, f in ipairs(FIELDS) do
+    if not (s[1] == 'bend' and f[2] == 'pitch') then
+      -- MOD LFO1 PITCH DEPTH defaults to 0AH: the mod wheel adds vibrato.
+      local default = (s[1] == 'mod' and f[2] == 'lfo1_pitch') and 10 or f[5]
+      EXPECT[#EXPECT + 1] = { s[1] .. '_' .. f[2], s[2], f[3], f[4], default,
+                              'dt1', nil, s[3] + f[1], 'bend' }
+    end
+  end
+end
 
 check(#P.PARAMS == #EXPECT,
       ('part_params has %d rows, the table pins %d'):format(#P.PARAMS, #EXPECT))
 
 for i, want in ipairs(EXPECT) do
-  local id, group, min, max, default, native, number, dt1 = table.unpack(want, 1, 8)
+  local id, group, min, max, default, native, number, dt1, block =
+    table.unpack(want, 1, 9)
   local p = P.PARAMS[i]
   check(p.id == id, ('row %d is %s, expected %s'):format(i, p.id, id))
+  if block then
+    check(p.dt1_block == block, id .. ': must address the 40 2x block')
+  end
   check(p.group == group, id .. ': group is ' .. tostring(p.group))
   check(p.min == min, ('%s: min is %s, expected %s'):format(id, p.min, min))
   check(p.max == max, ('%s: max is %s, expected %s'):format(id, p.max, max))
@@ -157,8 +238,17 @@ end
 -- The panel draws groups in this order, and every row must belong to one of
 -- them. A row in an unlisted group would simply never be drawn.
 local GROUP_ORDER = { 'Sends and Mix', 'Filter', 'Envelope', 'Tuning',
-                      'Vibrato', 'Switches and Performance' }
-check(#P.GROUPS == #GROUP_ORDER, 'GROUPS must list exactly the six sections')
+                      'Vibrato', 'Switches and Performance', 'Keyboard', 'Receive',
+                      'Scale Tuning', 'Mod Wheel', 'Pitch Bend',
+                      'Channel Aftertouch', 'Poly Aftertouch', 'CC1', 'CC2' }
+check(#P.GROUPS == #GROUP_ORDER, 'GROUPS must list exactly the fifteen sections')
+
+-- Rx Channel defaults to the Part's own number; every other row does not.
+for part = 1, 16 do
+  check(P.default_for(P.BY_ID.rx_channel, part) == part,
+        'Rx Channel on Part ' .. part .. ' must default to ' .. part)
+end
+check(P.default_for(P.BY_ID.level, 7) == 100, 'other rows ignore the Part')
 for i, g in ipairs(GROUP_ORDER) do
   check(P.GROUPS[i] == g, ('group %d is %s, expected %s'):format(i, P.GROUPS[i], g))
 end
@@ -204,12 +294,20 @@ for _, p in ipairs(P.PARAMS) do
   end
 end
 
--- Address family per row. Only Bend Range lives on 40 2x and only EQ on
--- 40 4x; everything else is a Patch Part parameter on 40 1x.
+-- Address family per row. Bend Range and the controller rows live on 40 2x
+-- (pinned above), only EQ on 40 4x; everything else is a Patch Part
+-- parameter on 40 1x.
 check(P.BY_ID.bend_range.dt1_block == 'bend', 'bend range is a 40 2x address')
 check(P.BY_ID.eq.dt1_block == 'switch', 'EQ is a 40 4x address')
+check(P.BY_ID.output.dt1_block == 'switch', 'Output Assign is a 40 4x address')
+local CONTROLLER_GROUPS = { ['Mod Wheel'] = true, ['Pitch Bend'] = true,
+  ['Channel Aftertouch'] = true, ['Poly Aftertouch'] = true,
+  ['CC1'] = true, ['CC2'] = true }
+check(P.BY_ID.cc1_number.dt1_block == nil and P.BY_ID.cc2_number.dt1_block == nil,
+      'the CC1/CC2 controller numbers are 40 1x fields')
 for _, p in ipairs(P.PARAMS) do
-  if p.id ~= 'bend_range' and p.id ~= 'eq' then
+  if p.id ~= 'bend_range' and p.id ~= 'eq' and p.id ~= 'output'
+     and not CONTROLLER_GROUPS[p.group] then
     check(p.dt1_block == nil, p.id .. ' must use the default 40 1x block')
   end
 end
@@ -250,3 +348,35 @@ for _, p in ipairs(P.PARAMS) do
 end
 
 H.pass('part addresses, part parameter table and validation')
+
+-- enum rows ------------------------------------------------------------------
+
+-- Use For Rhythm is three named states, not a range: None, DRUM 1, DRUM 2
+-- (manual p.238, 40 1x 15). A row that named fewer choices than its range
+-- allows would leave a reachable value with no name to show for it.
+do
+  local p = P.BY_ID['rhythm']
+  check(p, 'the rhythm row must exist')
+  check(p.display == 'enum', 'it is an enum, got ' .. tostring(p.display))
+  check(#p.choices == 3, 'three states, got ' .. #p.choices)
+  check(p.choices[1] == 'None' and p.choices[2] == 'DRUM 1'
+        and p.choices[3] == 'DRUM 2',
+    'named None, DRUM 1, DRUM 2, got ' .. table.concat(p.choices, ', '))
+
+  -- SysEx-only: the manual gives no CC or RPN, so there is nothing for
+  -- `Use SysEx? off` to fall back to.
+  check(p.native == P.DT1, 'it has no CC form and must be DT1')
+  check(P.has_sysex(p), 'and must be writable as SysEx')
+
+  -- Every enum row must name one choice per reachable value, or a value
+  -- would be selectable with nothing to display for it.
+  for _, row in ipairs(P.PARAMS) do
+    if row.display == 'enum' then
+      check(#row.choices == row.max - row.min + 1,
+        row.id .. ': ' .. #row.choices .. ' choices for ' ..
+        (row.max - row.min + 1) .. ' values')
+    end
+  end
+
+  H.pass('Use For Rhythm is a three-state enum, SysEx only (8 cases)')
+end

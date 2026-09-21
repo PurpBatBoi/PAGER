@@ -439,3 +439,181 @@ q24:pump()
 check(take24.sent[1].msg == string.char(0xF0) .. 'legacy' .. string.char(0xF7),
   'the existing SysEx path must still be framed')
 H.pass('the pre-existing SysEx API is unchanged (2 cases)')
+
+-- coalescing is per DEVICE as well as per target -----------------------------
+--
+-- Plan 001. The queue's identity for a pending parameter edit is the pair
+-- (resolved device, logical key), not the key alone.
+--
+-- Two things made the old key-only rule wrong at once. A track's hardware
+-- output selects which SC-8850 Part Group the messages reach, so the same
+-- logical key on two devices is two different physical destinations and
+-- discarding one for the other silently drops an edit the user made. And the
+-- Part Editor passed a bare parameter id, so an edit on Part 2 replaced an
+-- unsent edit to the same control on Part 1 -- the keys were equal because
+-- the Part was nowhere in them.
+--
+-- Nothing here changes pacing, ordering or run handling; only what counts as
+-- "the same pending edit".
+
+-- A rig whose device comes from the take itself, so one queue can be driven
+-- against two destinations the way two routed tracks would.
+local function multi_rig()
+  local sent = {}
+  local clock = { t = 0 }
+  local R = H.reaper(H.take())
+  R.GetMediaItemTake_Track = function(t) return t end
+  R.GetMediaTrackInfo_Value = function(track) return track.hwout end
+  R.SendMIDIMessageToHardware = function(dev, msg)
+    sent[#sent + 1] = { dev = dev, msg = msg }
+  end
+  local q = HW.new({ reaper = R, now = function() return clock.t end })
+  -- `hwout` packs the device in the bits above the channels, so device n is
+  -- n << 5 -- the same encoding I_MIDIHWOUT uses.
+  local function take_on(dev) return { hwout = dev << 5 } end
+  return q, take_on, sent, clock
+end
+
+local function cc_ev(cc, value)
+  return { { kind = 'cc', channel = 0, cc = cc, value = value } }
+end
+
+local function sx_ev(payload)
+  return { { kind = 'sysex', payload = payload } }
+end
+
+-- Same key, same device: coalesces, exactly as before.
+do
+  local q, take_on = multi_rig()
+  local a = take_on(0)
+  q:preview_events(cc_ev(74, 10), a, 'part:1:cutoff')
+  q:preview_events(cc_ev(74, 99), a, 'part:1:cutoff')
+  check(q:pending() == 1,
+    'one key on one device must still coalesce, got ' .. q:pending())
+  check(q.queue[1].payload:byte(3) == 99, 'the newest value must win')
+end
+
+-- Same key, two devices: two pending entries. The second destination has
+-- heard nothing yet, so there is nothing there to replace.
+do
+  local q, take_on, sent, clock = multi_rig()
+  local a, b = take_on(0), take_on(3)
+  q:preview_events(cc_ev(74, 10), a, 'part:1:cutoff')
+  q:preview_events(cc_ev(74, 99), b, 'part:1:cutoff')
+  check(q:pending() == 2,
+    'the same key on two devices must not coalesce, got ' .. q:pending())
+  check(q.queue[1].dev == 0 and q.queue[2].dev == 3,
+    'each entry must keep its own resolved device')
+
+  -- And both actually go out, to their own destinations.
+  q:pump()
+  clock.t = clock.t + HW.INTERVAL
+  q:pump()
+  check(#sent == 2, 'both must be sent, got ' .. #sent)
+  check(sent[1].dev == 0 and sent[2].dev == 3,
+    'each must reach the device it was queued for')
+  check(sent[1].msg:byte(3) == 10 and sent[2].msg:byte(3) == 99,
+    'and each must carry its own value')
+end
+
+-- A third edit on the first device replaces only that device's entry.
+do
+  local q, take_on = multi_rig()
+  local a, b = take_on(0), take_on(3)
+  q:preview_events(cc_ev(74, 10), a, 'part:1:cutoff')
+  q:preview_events(cc_ev(74, 20), b, 'part:1:cutoff')
+  q:preview_events(cc_ev(74, 30), a, 'part:1:cutoff')
+  check(q:pending() == 2, 'still one entry per device, got ' .. q:pending())
+  check(q.queue[1].dev == 0 and q.queue[1].payload:byte(3) == 30,
+    'the first device must take the newest value in its original position')
+  check(q.queue[2].dev == 3 and q.queue[2].payload:byte(3) == 20,
+    'the other device must be untouched')
+end
+
+-- Two Parts are two logical targets. This is the bug the Part-scoped keys
+-- fix: before them, both edits carried the id 'cutoff' and the second threw
+-- the first away.
+do
+  local q, take_on = multi_rig()
+  local a = take_on(0)
+  q:preview_events(cc_ev(74, 10), a, 'part:1:cutoff')
+  q:preview_events(cc_ev(74, 99), a, 'part:2:cutoff')
+  check(q:pending() == 2,
+    'two Parts must not coalesce, got ' .. q:pending())
+  check(q.queue[1].payload:byte(3) == 10 and q.queue[2].payload:byte(3) == 99,
+    'each Part must keep its own pending value')
+end
+
+-- Drum keys carry map, note and parameter. Any of the three differing is a
+-- different logical target; all three matching is the same one.
+do
+  local q, take_on = multi_rig()
+  local a = take_on(0)
+
+  q:preview_events(sx_ev('m1n60lvl-a'), a, 'drum:1:60:level')
+  q:preview_events(sx_ev('m1n60lvl-b'), a, 'drum:1:60:level')
+  check(q:pending() == 1, 'the same drum target must coalesce, got ' .. q:pending())
+  check(q.queue[1].payload == 'm1n60lvl-b', 'to the newest value')
+
+  q:preview_events(sx_ev('m2n60lvl'), a, 'drum:2:60:level')
+  check(q:pending() == 2, 'the other MAP is a different target')
+  q:preview_events(sx_ev('m1n61lvl'), a, 'drum:1:61:level')
+  check(q:pending() == 3, 'another NOTE is a different target')
+  q:preview_events(sx_ev('m1n60pan'), a, 'drum:1:60:pan')
+  check(q:pending() == 4, 'another PARAMETER is a different target')
+
+  -- And the same drum target on another device is still its own entry.
+  local b = take_on(3)
+  q:preview_events(sx_ev('m1n60lvl-c'), b, 'drum:1:60:level')
+  check(q:pending() == 5, 'the same drum target on another device must not coalesce')
+  check(q.queue[1].payload == 'm1n60lvl-b',
+    'and must not disturb the first device')
+end
+
+-- A multi-message run still replaces whole and stays ordered, and a run on
+-- another device is a separate run rather than a replacement.
+do
+  local q, take_on = multi_rig()
+  local a, b = take_on(0), take_on(3)
+  q:preview_events(rpn_events(2), a, 'part:1:bend_range')
+  check(q:pending() == 5, 'a run queues whole, got ' .. q:pending())
+  q:preview_events(rpn_events(9), b, 'part:1:bend_range')
+  check(q:pending() == 10,
+    'the same run on another device must not replace it, got ' .. q:pending())
+  q:preview_events(rpn_events(7), a, 'part:1:bend_range')
+  check(q:pending() == 10,
+    'replacing one device run must leave the other, got ' .. q:pending())
+
+  -- The surviving run stays whole and contiguous, and the replacement is
+  -- appended after it rather than interleaved.
+  local devs = {}
+  for _, m in ipairs(q.queue) do devs[#devs + 1] = m.dev end
+  check(table.concat(devs, ',') == '3,3,3,3,3,0,0,0,0,0',
+    'runs must stay whole and ordered, got ' .. table.concat(devs, ','))
+
+  -- Ordering inside the replacement is untouched: the run still ends on the
+  -- two RPN Null messages, CC101 then CC100, both 127.
+  check(q.queue[9].payload:byte(2) == 101 and q.queue[9].payload:byte(3) == 127,
+    'the replacement run must still close with RPN Null MSB')
+  check(q.queue[10].payload:byte(2) == 100 and q.queue[10].payload:byte(3) == 127,
+    'and then RPN Null LSB')
+end
+H.pass('coalescing is keyed by resolved device and logical target (24 cases)')
+
+-- preview_param, the Effects Editor's path, follows the same rule: its addr
+-- is a logical key too, and two devices are two destinations.
+do
+  local q, take_on = multi_rig()
+  local a, b = take_on(0), take_on(3)
+  q:preview_param(payload('v1'), a, 'addrA')
+  q:preview_param(payload('v2'), a, 'addrA')
+  check(q:pending() == 1, 'one device still coalesces, got ' .. q:pending())
+  q:preview_param(payload('v3'), b, 'addrA')
+  check(q:pending() == 2,
+    'the same addr on another device must not coalesce, got ' .. q:pending())
+  check(q.queue[1].payload == 'v2' and q.queue[1].dev == 0,
+    'the first device keeps its newest value')
+  check(q.queue[2].payload == 'v3' and q.queue[2].dev == 3,
+    'the second device gets its own entry')
+end
+H.pass('preview_param is device-scoped too (4 cases)')

@@ -156,6 +156,59 @@ expect('porta', 1, 1, false, 'cc ch0 #65=127')
 expect('porta', 0, 1, true, 'cc ch0 #65=0', 'portamento stays CC with SysEx on')
 expect('porta', 1, 1, true, 'cc ch0 #65=127', 'portamento stays CC with SysEx on')
 
+-- Mono/Poly is two controllers (manual p.229): Mono is CC126 (value ignored
+-- by the unit, 1 sent) and Poly is CC127 00. SysEx is 40 1x 13, 00/01
+-- (p.238). Part 10 checks the 40 1x block follows the Part.
+expect('mono_poly', 0, 1, false, 'cc ch0 #126=1')
+expect('mono_poly', 1, 1, false, 'cc ch0 #127=0')
+expect('mono_poly', 0, 10, false, 'cc ch9 #126=1')
+expect('mono_poly', 0, 1, true, dt1(param(1, 0x13), 0))
+expect('mono_poly', 1, 1, true, dt1(param(1, 0x13), 1))
+expect('mono_poly', 1, 10, true, dt1(param(10, 0x13), 1))
+
+-- Keyboard rows are DT1 in both modes (no CC exists). Rx Channel is 1-based
+-- on screen and 0-based on the wire, with 17 = Off = 10H (p.237).
+expect('rx_channel', 1, 1, false, dt1(param(1, 0x02), 0x00))
+expect('rx_channel', 16, 1, true, dt1(param(1, 0x02), 0x0F))
+expect('rx_channel', 17, 3, true, dt1(param(3, 0x02), 0x10), 'Rx Channel Off')
+expect('assign_mode', 2, 1, false, dt1(param(1, 0x14), 2))
+expect('vel_depth', 90, 1, true, dt1(param(1, 0x1A), 90))
+expect('vel_offset', 30, 1, true, dt1(param(1, 0x1B), 30))
+expect('key_low', 36, 1, true, dt1(param(1, 0x1D), 36))
+expect('key_high', 96, 1, false, dt1(param(1, 0x1E), 96))
+
+-- Scale Tuning: C at 40 1x 40, B at 4B, -64..+63 centred on 40H (p.238).
+expect('scale_c', -64, 1, true, dt1(param(1, 0x40), 0x00))
+expect('scale_c', 0, 1, false, dt1(param(1, 0x40), 0x40))
+expect('scale_b', 63, 1, true, dt1(param(1, 0x4B), 0x7F))
+
+-- The 40 2x controller block (pp.239-240). Pitch Control is 28H..58H for
+-- -24..+24; the other centred fields sit on 40H; depths are the raw byte.
+local function bend(part, lo) return GS.part_bend_addr(part, lo) end
+expect('mod_pitch', -24, 1, true, dt1(bend(1, 0x00), 0x28))
+expect('mod_pitch', 24, 1, false, dt1(bend(1, 0x00), 0x58))
+expect('mod_cutoff', 10, 1, true, dt1(bend(1, 0x01), 0x4A))
+expect('mod_lfo1_pitch', 10, 1, true, dt1(bend(1, 0x04), 0x0A))
+expect('bend_cutoff', -64, 1, true, dt1(bend(1, 0x11), 0x00))
+expect('caf_lfo2_tva', 127, 1, true, dt1(bend(1, 0x2A), 0x7F))
+expect('paf_amp', 0, 10, true, dt1(bend(10, 0x32), 0x40), 'Part 10 uses block 0')
+expect('cc1_pitch', 12, 1, true, dt1(bend(1, 0x40), 0x4C))
+expect('cc2_lfo2_tva', 100, 1, false, dt1(bend(1, 0x5A), 100))
+expect('cc1_number', 16, 1, true, dt1(param(1, 0x1F), 0x10))
+
+-- Output Assign: the manual's own worked example (p.61), byte for byte --
+-- Part 1 to OUTPUT-2 is F0 41 10 42 12 40 41 21 01 5D F7.
+expect('output', 1, 1, true, 'sysex ' .. hex(string.char(0x41, 0x10, 0x42, 0x12,
+                                                         0x40, 0x41, 0x21, 0x01, 0x5D)),
+       'Output Assign matches the manual example')
+expect('output', 3, 10, false, dt1(GS.part_addr(10, 0x21), 3), 'Output 2R, SysEx off')
+
+-- Receive switches are DT1 in both modes: 40 1x 03 .. 12, 23, 24.
+expect('rx_bend', 0, 1, false, dt1(param(1, 0x03), 0))
+expect('rx_nrpn', 1, 1, true, dt1(param(1, 0x0A), 1))
+expect('rx_bank_lsb', 0, 16, true, dt1(param(16, 0x24), 0))
+expect('cc2_number', 95, 1, true, dt1(param(1, 0x20), 0x5F))
+
 -- EQ has no CC at all, so both modes send the 40 4x 20 switch. These bytes
 -- are the hardware capture gs_sysex.lua already asserts against.
 local EQ_ON = 'sysex ' .. hex(string.char(0x41, 0x10, 0x42, 0x12,
@@ -338,3 +391,40 @@ for _, p in ipairs(P.PARAMS) do
 end
 
 H.pass('part encoders: every control, both modes, endpoints, RPN order and part blocks')
+
+-- Use For Rhythm ---------------------------------------------------------------
+
+-- Which drum map a Part plays: 40 1x 15, values 0/1/2 (manual p.238).
+--
+-- SysEx-only, so both modes must produce the same DT1 write -- there is no
+-- CC form for `Use SysEx? off` to fall back to, and silently sending nothing
+-- would look exactly like a Part that refused to change.
+do
+  local CASES = {
+    -- part, value, the 1x block byte the manual gives
+    { 1,  0, 0x11 },
+    { 1,  2, 0x11 },
+    { 10, 1, 0x10 },  -- Part 10 is x=0, the drum Part at power-on
+    { 16, 2, 0x1F },
+  }
+  for _, c in ipairs(CASES) do
+    local part, value, block = c[1], c[2], c[3]
+    for _, use_sysex in ipairs({ false, true }) do
+      local events = PM.encode('rhythm', value, part, use_sysex)
+      check(#events == 1,
+        ('part %d: one message, got %d'):format(part, #events))
+      check(events[1].kind == 'sysex',
+        ('part %d: must be SysEx in both modes, got %s')
+          :format(part, events[1].kind))
+
+      local pl = events[1].payload
+      -- 41 10 42 12 <40 1x 15> <value> <checksum>
+      check(pl:byte(5) == 0x40 and pl:byte(6) == block and pl:byte(7) == 0x15,
+        ('part %d: address must be 40 %02X 15, got %02X %02X %02X')
+          :format(part, block, pl:byte(5), pl:byte(6), pl:byte(7)))
+      check(pl:byte(8) == value,
+        ('part %d: value must be %d, got %d'):format(part, value, pl:byte(8)))
+    end
+  end
+  H.pass('Use For Rhythm writes 40 1x 15 in both modes (32 cases)')
+end

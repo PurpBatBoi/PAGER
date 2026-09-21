@@ -116,6 +116,27 @@ assert(eq_on_payload(1, false) ==
        'part 1 EQ OFF must match the hardware capture')
 assert(checksum({ 0x40, 0x02, 0x01, 0x46 }) == 0x77, 'manual p.87 example')
 
+-- The two shared drum maps live in their own address block: 41 mp rr, where
+-- m is 0 for DRUM 1 and 1 for DRUM 2, p is the parameter nibble 1..9, and rr
+-- is the MIDI note number (manual pp.70-72, p.240).
+--
+-- Unlike the Part blocks above there is no PART_BLOCK indirection here: the
+-- map number IS the high nibble of the middle byte. What the map is not is a
+-- Part -- a drum value belongs to the map, and every Part playing that map
+-- sees it -- so `mode` is 1 or 2 and never a Part number.
+local function drum_param_addr(mode, param_nibble, note)
+  assert(mode == 1 or mode == 2, 'drum map must be 1 or 2')
+  assert(type(param_nibble) == 'number' and param_nibble >= 1
+         and param_nibble <= 9 and param_nibble == math.floor(param_nibble),
+         'drum parameter nibble must be 1..9')
+  assert(type(note) == 'number' and note >= 0 and note <= 127
+         and note == math.floor(note), 'drum note must be an integer 0..127')
+  return { 0x41, (mode - 1) * 0x10 + param_nibble, note }
+end
+
+assert(drum_param_addr(1, 1, 0)[2] == 0x01, 'DRUM 1 Pitch must use middle 01')
+assert(drum_param_addr(2, 9, 127)[2] == 0x19, 'DRUM 2 Delay must use middle 19')
+
 -- The three address bytes of a DT1 payload, or nil when the payload is not
 -- one. is_dt1_at answers "is this that address"; this answers "which address
 -- is this", which is what the Part Editor needs to recognise its own previous
@@ -146,5 +167,6 @@ return {
   part_addr = part_addr, part_efx_addr = part_efx_addr,
   part_eq_addr = part_eq_addr, part_block = part_block,
   part_param_addr = part_param_addr, part_bend_addr = part_bend_addr,
+  drum_param_addr = drum_param_addr,
   dt1_addr_of = dt1_addr_of,
 }

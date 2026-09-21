@@ -31,6 +31,10 @@ local M = {}
 -- RPN controller numbers, and the Null that closes a run. Leaving the RPN
 -- selected would make the next stray CC6 anywhere in the take edit this
 -- parameter instead (manual p.228).
+-- Bank Select. MSB is CC0 and LSB is CC32, per the manual's control-change
+-- table (p.226); the SC-8850 selects its own tone map with LSB 4.
+local CC_BANK_MSB, CC_BANK_LSB = 0, 32
+
 local CC_DATA_MSB, CC_DATA_LSB = 6, 38
 local CC_RPN_LSB, CC_RPN_MSB = 100, 101
 local RPN_NULL = 127
@@ -73,7 +77,7 @@ end
 local function addr_of(p, part)
   local block = p.dt1_block
   if block == 'bend' then return GS.part_bend_addr(part, p.dt1) end
-  if block == 'switch' then return GS.part_eq_addr(part) end
+  if block == 'switch' then return GS.part_addr(part, p.dt1) end
   return GS.part_param_addr(part, p.dt1)
 end
 
@@ -177,6 +181,13 @@ local NATIVE = {
   bend_range = function(p, part, channel, value)
     return rpn_run(channel, p.rpn, round(value))
   end,
+  -- Mono is CC126 and Poly is CC127 00 (manual p.229). CC126's value is the
+  -- mono channel count, which the SC-8850 ignores -- it sets Mode 4 (M = 1)
+  -- whatever arrives -- so 1 is sent, matching the DT1 table's own note.
+  mono_poly = function(p, part, channel, value)
+    if value < 1 then return { cc_event(channel, p.cc_alt, 1) } end
+    return { cc_event(channel, p.cc, 0) }
+  end,
 }
 
 -- The relative modifiers and Pitch Key differ from the plain rows only in
@@ -226,7 +237,9 @@ function M.sysex_events(p, part, channel, value)
   if not P.has_sysex(p) then return nil end
   local build = SYSEX[p.id]
   if build then return build(p, part, channel, value) end
-  return { dt1_event(addr_of(p, part), { round(value) }) }
+  -- dt1_offset centres a signed field on 40H, or shifts Rx Channel's 1-based
+  -- channels to the wire's 0-based ones.
+  return { dt1_event(addr_of(p, part), { round(value) + (p.dt1_offset or 0) }) }
 end
 
 -- entry point ---------------------------------------------------------------------
@@ -261,11 +274,37 @@ function M.encode(id, value, part, use_sysex)
   return build(p, part, channel, v)
 end
 
+-- A voice selection: Bank Select MSB, Bank Select LSB, then Program Change.
+--
+-- Not a PARAMS row, because a voice is not a parameter with a range -- it is
+-- an address into the tone map, and its three messages must arrive in this
+-- order. Bank Select is latched by the hardware and only takes effect when
+-- the Program Change arrives, so a PC sent without its bank bytes selects
+-- from whichever bank was last set, which is how a voice change appears to
+-- work and picks the wrong instrument.
+--
+-- Returned as a run, so the queue keeps the three together and never
+-- reorders or coalesces them.
+function M.voice_events(part, msb, lsb, pc)
+  assert(part and part >= 1 and part <= 16, 'part must be 1..16')
+  for _, n in ipairs({ msb, lsb, pc }) do
+    assert(type(n) == 'number' and n >= 0 and n <= 127,
+           'voice bytes must be 0..127')
+  end
+  local channel = part - 1
+  return {
+    cc_event(channel, CC_BANK_MSB, msb),
+    cc_event(channel, CC_BANK_LSB, lsb),
+    { kind = 'pc', channel = channel, program = pc & 0x7F },
+  }
+end
+
 -- Whether an event list is an ordered run rather than a single message. The
 -- hardware queue keeps a run together as a batch, and phase 4 matches one for
 -- replacement across its whole PPQ span.
 function M.is_run(events) return #events > 1 end
 
+M.CC_BANK_MSB, M.CC_BANK_LSB = CC_BANK_MSB, CC_BANK_LSB
 M.CC_DATA_MSB, M.CC_DATA_LSB = CC_DATA_MSB, CC_DATA_LSB
 M.CC_RPN_LSB, M.CC_RPN_MSB, M.RPN_NULL = CC_RPN_LSB, CC_RPN_MSB, RPN_NULL
 

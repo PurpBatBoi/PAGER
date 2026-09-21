@@ -52,6 +52,11 @@ function M.encode_event(e)
   if e.kind == 'cc' then
     return M.channel_bytes(0xB0, e.channel, e.cc, e.value), CHANNEL
   end
+  if e.kind == 'pc' then
+    -- Program Change is a two-byte message: status and program, no second
+    -- data byte. channel_bytes omits it when none is given.
+    return M.channel_bytes(0xC0, e.channel, e.program), CHANNEL
+  end
   return e.payload, SYSEX
 end
 
@@ -86,6 +91,19 @@ end
 
 local NO_ROUTE = 'No MIDI hardware output on this track.'
 local NO_TAKE = 'No MIDI take: open a MIDI editor or select a MIDI item.'
+local NO_TRACK = 'No track: select one with a MIDI hardware output.'
+
+-- Resolve the device a track sends to.
+--
+-- A route is a property of the TRACK, not of the take: a take is only ever a
+-- way to reach one. Previewing therefore needs no MIDI item at all, which is
+-- what lets the Part Editor drive the hardware from a bare selected track.
+function M:resolve_track(track)
+  if not track then return nil, NO_TRACK end
+  local dev = M.decode_device(self.reaper.GetMediaTrackInfo_Value(track, 'I_MIDIHWOUT'))
+  if not dev then return nil, NO_ROUTE end
+  return dev
+end
 
 -- Resolve the device a take's track sends to. Captured once when a batch is
 -- queued and stored on every message, so changing the selected take mid-batch
@@ -94,9 +112,7 @@ function M:resolve(take)
   if not take then return nil, NO_TAKE end
   local track = self.reaper.GetMediaItemTake_Track(take)
   if not track then return nil, NO_TAKE end
-  local dev = M.decode_device(self.reaper.GetMediaTrackInfo_Value(track, 'I_MIDIHWOUT'))
-  if not dev then return nil, NO_ROUTE end
-  return dev
+  return self:resolve_track(track)
 end
 
 -- queueing -------------------------------------------------------------------
@@ -145,17 +161,33 @@ function M:preview_batch(payloads, take)
   return true
 end
 
+-- Whether a queued message is the pending copy of one logical edit.
+--
+-- The identity of a pending edit is the PAIR (resolved device, logical key),
+-- never the key alone. A track's hardware output selects which SC-8850 Part
+-- Group the messages reach, so the same key on two devices names two
+-- different physical destinations -- and replacing one with the other would
+-- silently drop an edit the user made and heard nothing of.
+--
+-- The logical key itself is the caller's, and it has to carry everything that
+-- makes the target distinct: a Part id for a Part control, and map, note and
+-- parameter for a drum control. A bare parameter id made an edit on Part 2
+-- discard an unsent edit to the same control on Part 1.
+local function same_target(m, dev, addr)
+  return m.class == PARAM and m.dev == dev and m.addr == addr
+end
+
 -- A settled parameter edit. It waits behind an active preset batch rather
 -- than jumping it, so the run the user hears stays in order. A pending edit
--- to the same address is replaced in place: only the newest value matters,
+-- to the same target is replaced in place: only the newest value matters,
 -- and keeping the old position preserves the order edits were made in.
 function M:preview_param(payload, take, addr)
   local dev, err = self:resolve(take)
   if not dev then return false, err end
   if addr then
     for _, m in ipairs(self.queue) do
-      if m.class == PARAM and m.addr == addr and not m.run then
-        m.payload, m.dev = payload, dev
+      if same_target(m, dev, addr) and not m.run then
+        m.payload = payload
         return true
       end
     end
@@ -164,17 +196,20 @@ function M:preview_param(payload, take, addr)
   return true
 end
 
--- Drop every pending parameter entry for one logical parameter, optionally
--- only the ones belonging to a multi-message run.
+-- Drop every pending parameter entry for one logical target, optionally only
+-- the ones belonging to a multi-message run.
+--
+-- `dev` is part of the match, not a detail the caller folded into `addr`:
+-- the queue already owns route resolution, so it is the only thing that
+-- knows which device a key actually resolved to.
 --
 -- A run is replaced whole or not at all: rewriting one message of an RPN in
 -- place would leave the selector of the old value in front of the Data Entry
 -- of the new one.
-function M:_drop_param(addr, only_runs)
+function M:_drop_param(dev, addr, only_runs)
   local kept = {}
   for _, m in ipairs(self.queue) do
-    local mine = m.class == PARAM and m.addr == addr
-                 and (not only_runs or m.run)
+    local mine = same_target(m, dev, addr) and (not only_runs or m.run)
     if not mine then kept[#kept + 1] = m end
   end
   self.queue = kept
@@ -187,11 +222,24 @@ end
 -- `addr` identifies the logical parameter, not a wire address, so the same
 -- coalescing rule applies across encodings: a newer edit to the same control
 -- replaces its unsent predecessor even when the user flipped `Use SysEx?`
--- between the two. What is never done is coalescing INSIDE a run, or
+-- between the two. It must name the whole target -- the Part for a Part
+-- control, the map, note and parameter for a drum one -- because the queue
+-- pairs it with the RESOLVED DEVICE and nothing else distinguishes two
+-- pending edits. What is never done is coalescing INSIDE a run, or
 -- reordering one -- an RPN whose Null arrives before its Data Entry writes
 -- nothing, and the queue is the last place that ordering could be lost.
-function M:preview_events(events, take, addr)
-  local dev, err = self:resolve(take)
+--
+-- `route` names where the messages go. A take resolves through its track, as
+-- every other preview does; a `{ track = t }` route resolves the track
+-- directly, which is what lets a Part be auditioned with no MIDI item in the
+-- project at all.
+function M:preview_events(events, route, addr)
+  local dev, err
+  if type(route) == 'table' and route.track ~= nil then
+    dev, err = self:resolve_track(route.track)
+  else
+    dev, err = self:resolve(route)
+  end
   if not dev then return false, err end
   if #events == 0 then return true end
 
@@ -209,12 +257,12 @@ function M:preview_events(events, take, addr)
   -- message in place, which keeps the position the user's earlier edit
   -- earned in the queue.
   if addr then
-    self:_drop_param(addr, not run)
+    self:_drop_param(dev, addr, not run)
     if not run then
       for _, m in ipairs(self.queue) do
-        if m.class == PARAM and m.addr == addr then
+        if same_target(m, dev, addr) then
           local payload, kind = M.encode_event(events[1])
-          m.payload, m.kind, m.dev = payload, kind, dev
+          m.payload, m.kind = payload, kind
           return true
         end
       end
@@ -283,7 +331,7 @@ function M:pump()
   return true
 end
 
-M.NO_ROUTE, M.NO_TAKE = NO_ROUTE, NO_TAKE
+M.NO_ROUTE, M.NO_TAKE, M.NO_TRACK = NO_ROUTE, NO_TAKE, NO_TRACK
 M.SYSEX, M.CHANNEL = SYSEX, CHANNEL
 M.PRESET, M.PARAM = PRESET, PARAM
 

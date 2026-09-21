@@ -1,0 +1,1621 @@
+; SC-8850 map - instrument definitions for REAPER
+
+Bank 0 4 Capital-Tones [SC8850]
+0 Piano 1
+1 Piano 2
+2 Piano 3
+3 Honky-tonk
+4 E.Piano 1
+5 E.Piano 2
+6 Harpsichord
+7 Clav.
+8 Celesta
+9 Glockenspiel
+10 Music Box
+11 Vibraphone
+12 Marimba
+13 Xylophone
+14 Tubular-bell
+15 Santur
+16 Organ 1
+17 Organ 2
+18 Organ 3
+19 Church Org.1
+20 Reed Organ
+21 Accordion Fr
+22 Harmonica
+23 Bandoneon
+24 Nylon-str.Gt
+25 Steel-str.Gt
+26 Jazz Gt.
+27 Clean Gt.
+28 Muted Gt.
+29 Overdrive Gt
+30 DistortionGt
+31 Gt.Harmonics
+32 Acoustic Bs.
+33 Fingered Bs.
+34 Picked Bass
+35 Fretless Bs.
+36 Slap Bass 1
+37 Slap Bass 2
+38 Synth Bass 1
+39 Synth Bass 2
+40 Violin
+41 Viola
+42 Cello
+43 Contrabass
+44 Tremolo Str
+45 PizzicatoStr
+46 Harp
+47 Timpani
+48 Strings
+49 Slow Strings
+50 Syn.Strings1
+51 Syn.Strings2
+52 Choir Aahs
+53 Voice Oohs
+54 SynVox
+55 OrchestraHit
+56 Trumpet
+57 Trombone
+58 Tuba
+59 MutedTrumpet
+60 French Horns
+61 Brass 1
+62 Synth Brass1
+63 Synth Brass2
+64 Soprano Sax
+65 Alto Sax
+66 Tenor Sax
+67 Baritone Sax
+68 Oboe
+69 English Horn
+70 Bassoon
+71 Clarinet
+72 Piccolo
+73 Flute
+74 Recorder
+75 Pan Flute
+76 Bottle Blow
+77 Shakuhachi
+78 Whistle
+79 Ocarina
+80 Square Wave
+81 Saw Wave
+82 Syn.Calliope
+83 Chiffer Lead
+84 Charang
+85 Solo Vox
+86 5th Saw Wave
+87 Bass & Lead
+88 Fantasia
+89 Warm Pad
+90 Polysynth
+91 Space Voice
+92 Bowed Glass
+93 Metal Pad
+94 Halo Pad
+95 Sweep Pad
+96 Ice Rain
+97 Soundtrack
+98 Crystal
+99 Atmosphere
+100 Brightness
+101 Goblin
+102 Echo Drops
+103 Star Theme
+104 Sitar
+105 Banjo
+106 Shamisen
+107 Koto
+108 Kalimba
+109 Bagpipe
+110 Fiddle
+111 Shanai
+112 Tinkle Bell
+113 Agogo
+114 Steel Drums
+115 Woodblock
+116 Taiko
+117 Melo. Tom 1
+118 Synth Drum
+119 Reverse Cym.
+120 Gt.FretNoise
+121 Breath Noise
+122 Seashore
+123 Bird
+124 Telephone 1
+125 Helicopter
+126 Applause
+127 Gun Shot
+
+Bank 1 4 Varitation-01 [SC8850]
+0 UprightPiano
+1 Pop Piano
+2 EG+Rhodes 1
+5 E.Piano 3
+6 Harpsichord2
+7 Clav. 2
+8 Pop Celesta
+10 Music Box 2
+11 Pop Vibe.
+15 Santur 2
+16 Organ 101
+17 Jazz Organ
+22 Harmonica 2
+26 Mellow Gt.
+27 Clean Half
+28 Muted Dis.Gt
+29 Overdrive 2
+30 Dist. Gt2
+32 Rockabilly
+33 Fingered Bs2
+34 Picked Bass2
+35 Fretless Bs2
+36 Slap Pop
+37 Slap Bass 3
+38 SynthBass101
+39 SynthBass201
+40 Violin Atk
+41 Viola Atk.
+42 Cello Atk.
+45 Vcs&Cbs Pizz
+46 Harp&Strings
+48 Bright Str
+49 SlowStrings2
+50 OB Strings
+51 Syn.Strings5
+53 Chorus Oohs
+54 SynVox 2
+55 Bass Hit
+56 Trumpet 2
+57 Trombone 2
+58 Tuba 2
+59 Cup Mute Tp
+60 Fr.Horn 2
+61 Brass ff
+62 JUNO Brass
+63 Soft Brass
+66 Tenor Sax
+67 Bari. Sax
+72 Piccolo
+73 Flute 2
+77 Shakuhachi
+78 Whistle 2
+80 MG Square
+81 OB2 Saw
+82 Vent Synth
+83 TB Lead
+84 Wire Lead
+85 Solo Vox 2
+86 Big Fives
+87 Big & Raw
+88 Fantasia 2
+89 Thick Matrix
+90 80's PolySyn
+91 Heaven II
+92 SoftBellPad
+93 Tine Pad
+94 Vox Pad
+95 Polar Pad
+96 Harmo Rain
+97 Ancestral
+98 Syn Mallet
+99 Warm Atmos
+100 Shining Star
+101 Goblinson
+102 Echo Bell
+103 Star Theme 2
+104 Sitar 2
+105 Muted Banjo
+106 Tsugaru
+107 Gu Zheng
+111 Shanai 2
+114 Island Mlt
+116 Small Taiko
+117 Real Tom
+119 Reverse Cym2
+120 Gt.Cut Noise
+121 Fl.Key Click
+122 Rain
+123 Dog
+124 Telephone 2
+125 Car-Engine
+126 Laughing
+127 Machine Gun
+
+Bank 2 4 Varitation-02 [SC8850]
+0 Mild Piano
+1 Rock Piano
+2 EG+Rhodes 2
+6 Harpsichord3
+7 Atk Clav.1
+15 Santur 3
+16 Ful Organ 1
+17 E.Organ 16+2
+27 Open Hard 1
+28 TC Muted Gt.
+29 Overdrive 3
+30 Dazed Guitar
+33 Jazz Bass
+34 Picked Bass3
+35 Fretless Bs3
+38 CS Bass
+39 Modular Bass
+44 Trem Str.St.
+45 Chamber Pizz
+46 Harp St.
+48 ChamberStr
+49 SlowStrings3
+50 StackStrings
+51 JUNO Strings
+53 Voice Oohs 2
+54 SynVox 3
+55 6th Hit
+56 Trumpet
+57 Twin bones
+59 MuteTrumpet2
+60 Horn + Orche
+61 Bones Sect.
+62 Stack Brass
+63 Warm Brass
+73 Flute Exp.
+80 Hollow Mini
+81 Pulse Saw
+82 Pure PanLead
+83 Hybrid Lead
+84 FB.Charang
+86 5th Lead
+87 Fat & Perky
+88 New Age Pad
+89 Horn Pad
+90 Polysynth 2
+91 SC Heaven
+92 JP8 Sqr Pad
+93 Panner Pad
+94 Vox Sweep
+95 Ambient BPF
+96 African wood
+97 Prologue
+98 Soft Crystal
+99 Nylon Harp
+100 OB Stab
+101 50's Sci-Fi
+102 Echo Pan
+103 Star Mind
+104 Detune Sitar
+117 Real Tom 2
+119 Reverse Cym3
+120 String Slap
+121 Brth Nz Menu
+122 Thunder
+123 Horse-Gallop
+124 DoorCreaking
+125 Car-Stop
+126 Screaming
+127 Lasergun
+
+Bank 3 4 Varitation-03 [SC8850]
+7 Atk Clav.2
+16 Ful Organ 2
+17 Jazz Organ 2
+27 Open Hard 2
+29 More Drive
+30 Distortion
+33 Jazz Bass 2
+34 Picked Bass4
+35 Fretless Bs4
+38 JP-4 Bass
+39 Seq Bass
+45 St.Pizzicato
+48 Cello sect.
+50 JP Strings
+51 FilteredOrch
+53 Chorus Oohs2
+55 Euro Hit
+56 Dark Trumpet
+57 Bones & Tuba
+59 MuteTrumpet3
+60 Wide FreHrns
+61 St. Brass ff
+62 SH-5 Brass
+63 Synth Brass3
+73 Flt Travelso
+80 Mellow FM
+81 Feline GR
+83 Unison SqrLd
+84 Fat GR Lead
+86 5th Ana.Clav
+87 JUNO Rave
+88 Bell Heaven
+89 Rotary Strng
+90 Poly King
+91 Itopia
+92 7thBelPad
+93 Steel Pad
+95 Sync Pad
+96 Anklung Pad
+97 Prologue 2
+98 Round Glock
+99 Harpvox
+100 Brass Star
+101 Abduction
+102 Echo Pan 2
+103 Star Dust
+104 Sitar 3
+117 Jazz Tom
+119 Reverse Cym4
+120 Gt.CutNoise2
+121 Fl.Breath 1
+122 Wind
+123 Bird 2
+124 Door
+125 Car-Pass
+126 Punch
+127 Explosion
+
+Bank 4 4 Varitation-04 [SC8850]
+16 Ful Organ 3
+17 Jazz Organ 3
+27 JC Clean Gt.
+29 Guitar Pinch
+30 Dist.Fast
+33 Rock Bass
+34 Double Pick
+35 Syn Fretless
+38 JP-8 Bass
+39 MG Bass
+48 Bright Str.2
+50 Chorus Str.
+51 JP Saw Str.
+53 OohsCodeMaj7
+56 Trumpet & Nz
+57 Bright Tb
+61 Quad Brass1
+62 MKS Brass
+63 Sync Brass
+80 CC Solo
+81 Big Lead
+83 FatSolo Lead
+84 Windy GR Ld
+86 5th Pulse
+87 JP8 BsLead 1
+88 Fantasia 3
+89 OB Soft Pad
+90 Super Poly
+91 Water Space
+92 Steel Glass
+93 Special Rave
+95 Warriors
+96 Rattle Pad
+97 Hols Strings
+98 Loud Glock
+99 HollowReleas
+100 Choir Stab
+101 Auhbient
+102 Big Panner
+103 Rep.Trance
+104 Sitar/Drone
+117 Brush Tom
+120 Dist.CutNoiz
+121 Fl.Breath 2
+122 Stream
+123 Kitty
+124 Scratch
+125 Car-Crash
+126 Heart Beat
+127 Eruption
+
+Bank 5 4 Varitation-05 [SC8850]
+16 Ful Organ 4
+17 Jazz Organ 4
+27 Atk CleanGt.
+29 Attack Drive
+30 Attack Dist
+33 Heart Bass
+35 Mr.Smooth
+38 P5 Bass
+39 Mg Oct Bass1
+48 Bright Str.3
+51 Hybrid Str.2
+53 OohsCodeSus4
+61 Quad Brass2
+62 Jump Brass
+63 Fat SynBrass
+80 Shmoog
+81 Velo Lead
+83 ForcefulLead
+84 Mellow GR Ld
+86 JP 5th Saw
+87 JP8 BsLead 2
+88 Fantasia 4
+89 Sine Pad
+91 Cold Space
+92 Bottle Stack
+93 Metal Pad 2
+96 Saw Impulse
+97 HistoryWave
+98 GlockenChime
+99 Nylon+Rhodes
+100 D-50 Retour
+101 LFO Pad
+102 Reso Panner
+103 Etherality
+104 Sitar 4
+120 Bass Slide
+121 Fl.Breath 3
+122 Bubble
+123 Growl
+124 Wind Chimes
+125 Siren
+126 Footsteps
+127 Big Shot
+
+Bank 6 4 Varitation-06 [SC8850]
+16 Ful Organ 5
+17 Jazz Organ 5
+33 AttackFinger
+38 JPMG Bass
+39 MG Oct Bass2
+48 Quad Strings
+51 DistStrings
+53 Jazz Scat
+63 DeepSynBrass
+80 LM Square
+81 GR-300
+83 Oct.UnisonLd
+84 GR & Pulse
+86 JP8000 5thFB
+87 SH-5 Bs.Lead
+88 After D !
+89 OB Soft Pad2
+91 Noise Peaker
+96 Strange Str.
+98 Clear Bells
+99 Ambient Pad
+100 SouthernWind
+101 Random Str
+102 Water Piano
+103 Mystic Pad
+120 Pick Scrape
+121 Vox Breath 1
+122 Wind 2
+123 Growl 2
+125 Train
+126 Applause 2
+127 Explosion 2
+
+Bank 7 4 Varitation-07 [SC8850]
+16 Ful Organ 6
+17 Jazz Organ 6
+33 Finger Slap
+39 MG Blip Bs
+48 Mild Strings
+51 JUNOFullStr.
+80 JP8000 TWM
+81 LA Saw
+83 Unison SawLd
+87 Delayed Lead
+88 260HarmPad
+91 Bamboo Hit
+96 FastFWD Pad
+98 ChristmasBel
+99 Invisible
+100 SymbolicBell
+101 Random Pad
+102 Echo SynBass
+121 Vox Breath 2
+122 Cricket
+123 Fancy Animal
+124 Scratch 2
+125 Jetplane
+126 Small Club
+
+Bank 8 4 Varitation-08 [SC8850]
+0 Upright P w
+1 Pop Piano w
+2 Piano 3w
+3 Honky-tonk 2
+4 St.Soft EP
+5 Detuned EP 2
+6 Coupled Hps.
+7 Comp Clav.
+10 St.Music Box
+11 Vibraphone w
+12 Marimba w
+13 Xylophone w
+14 Church Bell
+15 Cimbalom
+16 Trem. Organ
+17 Chorus Or.2
+18 Rotary Org.
+19 Church Org.2
+20 Wind Organ
+21 Accordion It
+22 B.Harp Basic
+23 Bandoneon 2
+24 Ukulele
+25 12-str.Gt
+26 Pedal Steel
+27 Chorus Gt.
+28 Funk Pop
+29 LP OverDrvGt
+30 Feedback Gt.
+31 Gt. Feedback
+32 Wild A.Bass
+33 ChorusJazzBs
+34 Muted PickBs
+35 Wood+FlessBs
+36 Reso Slap
+37 FM Slap
+38 Acid Bass
+39 Beef FM Bass
+40 Slow Violin
+44 Slow Tremolo
+45 Solo Pizz.
+46 Uillean Harp
+48 Orchestra
+49 Legato Str.
+50 Syn.Strings3
+51 Air Strings
+52 St.ChoirAahs
+53 Voice Dahs
+54 Syn.Voice
+55 Impact Hit
+56 Flugel Horn
+57 Bs. Trombone
+58 Tuba + Horn
+59 Muted Horns
+60 F.Hrn Slow
+61 Brass 2
+62 Pro Brass
+63 SynBrass sfz
+64 Soprano Exp.
+65 AltoSax Exp.
+66 BreathyTn.
+67 Bari & Tenor
+68 Oboe Exp.
+71 Bs Clarinet
+72 Nay
+73 Flute + Vln
+75 Kawala
+80 2600 Sine
+81 Doctor Solo
+82 LM Pure Lead
+83 Mad Lead
+84 Dist.Lead
+85 Vox Lead
+86 4th Lead
+89 Octave Pad
+90 Power Stack
+91 Cosmic Voice
+94 Horror Pad
+95 Converge
+96 Clavi Pad
+97 Rave
+98 Vibra Bells
+99 Pulsey Key
+100 Org Bell
+101 LowBirds Pad
+102 Pan Sequence
+103 Dream Pad
+104 Tambra
+105 Rabab
+106 Syn Shamisen
+107 Taisho Koto
+108 Sanza
+109 Didgeridoo
+110 Er Hu
+111 Pungi
+112 Bonang
+113 Atarigane
+115 Castanets
+116 Concert BD
+117 Melo. Tom 2
+118 808 Tom
+119 Rev.Snare 1
+120 Gt. FX Menu
+121 Trombone Nz
+123 Seal
+124 ScratchKey
+125 Starship
+126 ApplauseWave
+
+Bank 9 4 Varitation-09 [SC8850]
+0 Mild Piano w
+1 Rock Piano w
+4 Cho. E.Piano
+5 Detuned EP 3
+11 Vibraphones
+14 Carillon
+16 Organ o
+17 Octave Organ
+21 Dist. Accord
+22 B.Harp Suppl
+25 Nylon+Steel
+27 JC Chorus Gt
+29 LP OverDrv
+30 Feedback Gt2
+31 Gt.Feedback2
+32 Atk A.Bass
+36 Unison Slap
+38 TB303 Bass
+39 Dly Bass
+44 Suspense Str
+48 Orchestra 2
+49 Warm Strings
+50 Syn.Strings4
+51 Atk Syn Str.
+52 Melted Choir
+53 JzVoice Dat
+54 Silent Night
+55 Philly Hit
+60 Dual Horns
+61 Brass 3
+62 P5 Brass
+63 OB Brass
+65 Grow Sax
+66 St.Tenor Sax
+72 Nay Tremolo
+73 Pipe & Reed
+80 Sine Lead
+81 Fat Saw Lead
+82 LM Blow Lead
+83 CrowdingLead
+84 Acid Guitar1
+85 LFO Vox
+89 Stack Pad
+90 Octave Stack
+91 Auh Vox
+94 SynVox Pad
+95 Shwimmer
+96 EP Pad
+98 Digi Bells
+99 Noise Piano
+101 Falling Down
+102 Aqua
+103 Silky Pad
+105 San Xian
+108 Bodhran
+109 Uillean Pipe
+110 Gao Hu
+112 Gender
+116 ConcertBD Mt
+117 Rock Tom
+118 Elec Perc
+119 Rev.Snare 2
+120 Bartok Pizz.
+121 Trumpet Nz
+124 TapeRewind
+125 Burst Noise
+126 BabyLaughing
+
+Bank 10 4 Varitation-10 [SC8850]
+4 SilentRhodes
+5 EP Legend
+14 Church Bell2
+16 Ful Organ 7
+25 Atk Steel Gt
+29 LP Half Drv
+38 Tekno Bass
+39 X Wire Bass
+44 SuspenseStr2
+48 Tremolo Orch
+49 St.Slow Str.
+50 Syn.Strings6
+51 StraightStr.
+52 Church Choir
+53 JzVoice Bap
+54 Syn.Voice 2
+55 Double Hit
+61 Brass sfz
+62 OrchSynBrass
+63 Reso Brass
+80 KG Lead
+81 JP8000 Saw
+83 Double Sqr.
+84 Acid Guitar2
+85 Vox Lead 2
+89 Human Pad
+90 Reso Stack
+91 AuhAuh
+94 SynVox Pad 2
+95 Celestial Pd
+96 Tambra Pad
+98 Music Bell
+99 Heaven Atmos
+101 LFO RAVE
+102 Panning Lead
+103 Dream Pad 2
+108 Bodhran Mute
+109 UillnPipe Nm
+112 Gamelan Gong
+118 Sine Perc.
+120 Guitar Slap
+124 Phono Noise
+125 Calculating
+
+Bank 11 4 Varitation-11 [SC8850]
+16 Ful Organ 8
+29 LP Half Drv2
+38 TB303 Bass 2
+39 WireStr Bass
+48 Choir Str.
+49 St.Slow Str2
+50 Syn.Strings7
+52 Boys Choir 1
+53 JzVoice Dow
+55 Perc. Hit
+63 DistSqrBrass
+80 Twin Sine
+81 D-50 Fat Saw
+84 Dance Dst.Gt
+89 Sync Brs.Pad
+90 Techno Stack
+91 Vocorderman
+94 Breath&Rise
+95 Bag Sweep
+96 CP Pad
+98 Analog Bell
+99 Tambra Atmos
+101 LFO Horror
+102 PanningBrass
+103 Silky Pad 2
+109 UillnPipe Or
+112 St.Gamelan
+118 606 Tom
+120 Chord Stroke
+124 MC-500 Beep
+125 Perc. Bang
+
+Bank 12 4 Varitation-12 [SC8850]
+16 Ful Organ 9
+29 LP Chorus
+38 Kicked TB303
+39 Blip Bass
+48 Strings+Horn
+49 S.Str+Choir
+50 LoFi Strings
+52 Boys Choir 2
+53 JzVoice Thum
+55 Shock Wave
+61 Brass sfz 2
+63 JP8000SawBrs
+81 OB DoubleSaw
+84 DanceDst.Gt2
+89 Oct.PWM Pad
+90 Pulse Stack
+91 Holy Voices
+94 Tears Voices
+95 Sweep Pipe
+98 Blow Bell
+101 LFO Techno
+112 Jang Gu
+118 909 Tom
+120 Biwa Stroke
+124 Scratch 3
+125 Burner
+
+Bank 13 4 Varitation-13 [SC8850]
+38 TB303 Saw Bs
+39 RubberBass 1
+48 Str.+Flute
+49 S.Str+Choir2
+52 St.BoysChoir
+55 Bounce Hit
+81 JP DoubleSaw
+89 JP Soft Pad
+90 TwinOct.Rave
+95 Sweep Stack
+98 Hyper Bell
+101 Alternative
+112 Jegogan
+118 606 Dist.Tom
+120 Biwa Tremolo
+124 Scratch 4
+125 Glass & Glam
+
+Bank 14 4 Varitation-14 [SC8850]
+38 Rubber303 Bs
+39 Syn Bell Bs
+48 Choir Str.2
+52 Rich Choir
+55 Drill Hit
+61 FatPop Brass
+81 FatSawLead 2
+90 Oct.Rave
+95 Deep Sweep
+101 UFO FX
+112 Jublag
+124 Scratch 5
+125 Ice Ring
+
+Bank 15 4 Varitation-15 [SC8850]
+38 Reso 303 Bs
+39 Odd Bass
+48 Choir Str.3
+55 Thrill Hit
+81 JP SuperSaw
+90 Happy Synth
+95 Stray Pad
+101 Gargle Man
+112 Pemade
+124 Scratch 6
+125 Over Blow
+
+Bank 16 4 Varitation-16 [SC8850]
+0 European Pf
+1 Dance Piano
+4 FM+SA EP
+5 St.FM EP
+6 Harpsi.w
+7 Reso Clav.
+12 Barafon
+14 Tubularbellw
+15 Zither 1
+16 60's Organ 1
+18 Rotary Org.S
+19 Church Org.3
+20 Puff Organ
+21 Cho. Accord
+23 Bandoneon 3
+24 Nylon Gt.o
+25 Mandolin
+27 TC FrontPick
+28 Funk Gt.2
+30 Power Guitar
+31 Ac.Gt.Harmnx
+32 Bass + OHH
+33 F.Bass/Harm.
+34 P.Bass/Harm.
+38 Reso SH Bass
+39 RubberBass 2
+45 Solo Spic.
+46 Synth Harp
+48 St. Strings
+50 High Strings
+52 Choir Hahs
+53 VoiceLah Fem
+54 VP330 Choir
+55 Lo Fi Rave
+56 4th Trumpets
+57 Euphonium
+60 Synth Horn
+61 Brass Fall
+62 Oct SynBrass
+63 Velo Brass 1
+65 AltoSax + Tp
+68 Multi Reed
+71 Multi Wind
+72 Di
+73 Tron Flute
+75 Zampona
+80 P5 Square
+81 Waspy Synth
+84 P5 Sync Lead
+90 ForwardSweep
+98 Choral Bells
+101 Sweep FX
+103 New Century
+104 Tamboura
+105 Gopichant
+107 Kanoon
+111 Hichiriki
+112 RAMA Cymbal
+113 Tambourine
+115 Angklung
+116 Jungle BD
+117 Rash SD
+119 Rev.Kick 1
+120 A.Bs.Nz Menu
+122 Pink Noise
+124 Scratch 7
+125 Crack Bottle
+126 Voice One
+
+Bank 17 4 Varitation-17 [SC8850]
+4 Dist E.Piano
+7 Phase Clav
+12 Barafon 2
+15 Zither 2
+16 60's Organ 2
+18 Rock Organ 1
+25 Mandolin 2
+27 TC Rear Pick
+30 Power Gt.2
+38 TB303 Sqr Bs
+39 SH101 Bass 1
+45 StringsSpic.
+48 St.Strings 2
+50 Hybrid Str.
+53 ChorusLahFem
+54 Vinyl Choir
+55 Techno Hit
+61 Trumpet Fall
+62 Hybrid Brass
+63 Transbrass
+65 Sax Section
+71 Quad Wind
+73 Indian Flute
+75 Zampona Atk
+80 OB Square
+81 PM Lead
+84 Fat SyncLead
+90 ReverseSweep
+98 Air Bells
+101 LM Has Come
+103 7th Atmos.
+112 Kajar
+115 Angkl Rhythm
+116 Techno BD
+117 House SD
+119 Rev.ConBD
+120 D.Gt.Nz Menu
+122 White Noise
+125 Pour Bottle
+126 Voice Two
+
+Bank 18 4 Varitation-18 [SC8850]
+16 60's Organ 3
+18 Rock Organ 2
+25 MandolinTrem
+27 TC Clean ff
+30 5th Dist.
+38 TB303 DistBs
+39 SH101 Bass 2
+48 St.Strings 3
+53 VoiceLuh Fem
+54 JX8P Vox
+55 Dist. Hit
+62 OctSynBrass2
+80 JP-8 Square
+81 CS Saw Lead
+84 Rock Lead
+98 Bell Harp
+101 FallinInsect
+103 Galaxy Way
+112 Kelontuk
+116 Bounce
+117 Jungle SD
+120 E.Gt.NzMenu1
+125 Soda
+126 Voice Three
+
+Bank 19 4 Varitation-19 [SC8850]
+16 Farf Organ
+27 TC Clean 2
+38 Clavi Bass
+39 Smooth Bass
+48 Orchestra 3
+53 ChorusLuhFem
+54 Analog Voice
+55 Bam Hit
+62 BPF Brass
+80 Dist Square
+84 5th DecaSync
+98 Gamelimba
+101 LFO Oct.Rave
+103 Rising OSC.
+107 Kanoon+Choir
+112 Kelontuk Mt
+117 909 SD
+120 E.Gt.NzMenu2
+125 Open CD Tray
+126 Voice Tah
+
+Bank 20 4 Varitation-20 [SC8850]
+27 LP Rear Pick
+38 Hammer
+39 SH101 Bass 3
+48 Orchestra 4
+53 VoiceLan Fem
+55 Bit Hit
+80 303SquarDst1
+84 Dirty Sync
+98 JUNO Bell
+101 Just Before
+112 Kelontuk Sid
+120 G.StrokeMenu
+125 Audio Switch
+126 Voice Whey
+
+Bank 21 4 Varitation-21 [SC8850]
+27 LP Rear 2
+38 Jungle Bass
+39 Spike Bass
+53 ChorusLanFem
+55 Bim Hit
+80 303SquarDst2
+84 DualSyncLead
+98 JP Bell
+101 RND Fl.Chord
+112 Kopyak Op
+120 Gt.SlideMenu
+125 Key Typing
+
+Bank 22 4 Varitation-22 [SC8850]
+27 LP RearAtack
+38 Square Bass
+39 House Bass
+53 VoiceAah Fem
+55 Technorg Hit
+80 303 Mix Sqr
+84 LA Brass Ld
+98 Pizz Bell
+101 RandomEnding
+112 Kopyak Mt
+120 A.Bs.Mute Nz
+125 SL 1
+126 Voice Kikit
+
+Bank 23 4 Varitation-23 [SC8850]
+27 Mid Tone GTR
+38 Square Bass2
+39 KG Bass
+53 VoiceUuh Fem
+55 Rave Hit
+80 Dual Sqr&Saw
+98 Bottom Bell
+101 Random Sine
+112 Ceng Ceng
+120 A.Bs.TouchNz
+125 SL 2
+126 Voice ComeOn
+
+Bank 24 4 Varitation-24 [SC8850]
+0 Piano + Str.
+4 Wurly
+5 Hard FM EP
+6 Harpsi.o
+7 Clav.o
+12 Log drum
+15 Dulcimer
+16 Cheese Organ
+18 Rotary Org.F
+19 Organ Flute
+21 Hard Accord
+24 Velo Harmnix
+27 Chung Ruan
+28 Jazz Man
+30 Rock Rhythm
+31 E.Bass Harm.
+38 Arpeggio Bs
+39 Sync Bass
+46 Yang Qin
+48 Velo Strings
+50 Tron Strings
+52 Chorus Lahs
+53 Fem Lah&Lan
+55 Strings Hit
+56 Bright Tp.
+60 F.Horn Rip
+61 Octave Brass
+75 Tin Whistle
+80 Pulse Lead
+81 MG Saw 1
+84 JUNO Sub Osc
+90 Minor Rave
+101 EatingFilter
+105 Oud
+107 Oct Harp
+111 Mizmar
+112 Reyoung
+115 Finger Snaps
+116 KendangWadon
+117 Jngl SD Roll
+119 Rev.Tom 1
+120 A.Bs.AtackNz
+125 Car Engine 2
+126 Voice Aou
+
+Bank 25 4 Varitation-25 [SC8850]
+0 Piano + Str2
+4 Hard Rhodes
+16 D-50 Organ
+21 Soft Accord
+27 Chung Ruan 2
+30 Rock Rhythm2
+39 MG 5th Bass
+46 Yang Qin 2
+50 Noiz Strings
+55 Stack Hit
+56 Warm Tp.
+61 Brass + Reed
+75 TinWhtsle Nm
+80 JP8 PulseLd1
+81 MG Saw 2
+84 2600 Sub Osc
+101 Noise&SawHit
+112 Kempur
+116 Bebarongan
+119 Rev.Tom 2
+120 TC Up Nz
+125 Car Horn
+126 Voice Oou
+
+Bank 26 4 Varitation-26 [SC8850]
+0 Piano+Choir1
+4 MellowRhodes
+16 JUNO Organ
+30 Dist Rtm GTR
+39 RND Bass
+46 SynthYangQin
+55 Industry Hit
+56 Warm Tp.2
+61 Fat + Reed
+75 TinWhtsle Or
+80 JP8 PulseLd2
+81 OB Saw 1
+84 JP8000Fd Osc
+101 Pour Magic
+116 Pelegongan
+119 Rev.Tom 3
+120 TC DownMt.Nz
+125 Boeeeen
+126 Voice Hie
+
+Bank 27 4 Varitation-27 [SC8850]
+0 Piano+Choir2
+16 Hybrid Organ
+39 WowMG Bass
+55 Clap Hit
+56 Twin Tp.
+80 MG Reso. Pls
+81 OB Saw 2
+101 DancingDrill
+116 Dholak 1
+119 Rev.Tom 4
+120 TC UpMt.Nz
+125 R.Crossing
+
+Bank 28 4 Varitation-28 [SC8850]
+16 VS Organ
+39 Bubble Bass
+80 JP8 PulseLd3
+81 D-50 Saw
+101 Dirty Stack
+105 Oud+Strings
+116 Dholak 2
+120 TC Down Nz
+125 Compresser
+
+Bank 29 4 Varitation-29 [SC8850]
+16 Digi Church
+39 Attack Pulse
+80 260RingLead
+81 SH-101 Saw
+101 Big Blue
+120 DstGT.Up Nz
+125 Sword Boom!
+
+Bank 30 4 Varitation-30 [SC8850]
+16 JX-8P Organ
+39 Sync Bass 2
+80 303DistLead
+81 CS Saw
+101 Static Hit
+120 DstGT.DwnNz1
+125 Sword Cross
+
+Bank 31 4 Varitation-31 [SC8850]
+16 FM Organ
+39 Pulse Mix Bs
+80 JP8000DistLd
+81 MG Saw Lead
+101 Atl.Mod.FX
+120 DstGT.DwnNz2
+125 Stab! 1
+
+Bank 32 4 Varitation-32 [SC8850]
+5 EP Phase
+6 Synth Harpsi
+7 Analog Clav.
+16 70's E.Organ
+17 Perc. Organ
+19 Trem.Flute
+24 Nylon Gt.2
+25 Steel Gt.2
+38 Hit&Saw Bass
+39 MG Dist Bass
+48 Oct Strings1
+52 Chorus Aahs
+53 VoiceWah Mal
+56 Syn. Trumpet
+61 Orch Brass
+80 HipHop SinLd
+81 OB Saw Lead
+101 Acid Copter
+105 Pi Pa
+111 Suona 1
+112 Jngl Crash
+115 909 HandClap
+116 Jngl BD Roll
+120 DstGT.MuteNz
+125 Stab! 2
+
+Bank 33 4 Varitation-33 [SC8850]
+7 JP8 Clav. 1
+16 Even Bar
+17 Perc.Organ 2
+19 Theater Org.
+25 Steel + Body
+38 Ring Bass
+39 Seq Bass 2
+48 Oct Strings2
+52 Male Aah+Str
+53 ChorusWahMal
+61 Orch Brass 2
+80 HipHop SqrLd
+81 P5 Saw Lead
+111 Suona 2
+
+Bank 34 4 Varitation-34 [SC8850]
+17 Perc.Organ 3
+38 AtkSineBass
+39 3rd Bass
+48 ContraBsSect
+53 VoiceWoh Mal
+80 HipHop PlsLd
+81 MG unison
+120 Gt.StrokeNz5
+
+Bank 35 4 Varitation-35 [SC8850]
+7 JP8 Clav. 2
+17 Perc.Organ 4
+38 OB sine Bass
+39 MG Oct Bass
+53 ChorusWohMal
+61 St.FatPopBrs
+80 Flux Pulse
+81 Oct Saw Lead
+120 StlGt.SldNz1
+
+Bank 36 4 Varitation-36 [SC8850]
+7 SynRingClav.
+38 Auxiliary Bs
+39 SlowEnvBass
+53 VoiceAah Mal
+61 St.Orch Brs
+81 Natural Lead
+120 StlGt.SldNz2
+
+Bank 37 4 Varitation-37 [SC8850]
+7 SynDistClav.
+39 Mild Bass
+53 VoiceOoh Mal
+61 St.Orch Brs2
+120 StlGt.SldNz3
+
+Bank 38 4 Varitation-38 [SC8850]
+7 JP8000 Clav.
+39 DistEnvBass
+61 St.Orch Brs3
+120 StlGt.SldNz4
+
+Bank 39 4 Varitation-39 [SC8850]
+7 Pulse Clav
+39 MG LightBass
+120 Gt.StrokeNz1
+
+Bank 40 4 Varitation-40 [SC8850]
+16 Organ Bass
+24 Lequint Gt.
+38 303SqDistBs
+39 DistSynBass
+48 60s Strings
+53 Humming
+81 SequenceSaw1
+112 Crash Menu
+115 HandClapMenu
+116 Kick Menu 1
+117 SD Menu 1
+119 Rev.SD Menu1
+120 Gt.StrokeNz2
+
+Bank 41 4 Varitation-41 [SC8850]
+38 303SqDistBs2
+39 Rise Bass
+81 SequenceSaw2
+112 RideCym Menu
+116 Kick Menu 2
+117 SD Menu 2
+119 Rev.SD Menu2
+120 Gt.StrokeNz3
+
+Bank 42 4 Varitation-42 [SC8850]
+38 303SqDistBs3
+39 Cyber Bass
+81 Reso Saw
+112 RideBellMenu
+116 Kick Menu 3
+117 SD Menu 3
+119 Rev.SD Menu3
+120 Gt.StrokeNz4
+
+Bank 43 4 Varitation-43 [SC8850]
+38 303Sqr.Rev
+81 Cheese Saw 1
+116 Kick Menu 4
+117 SD Menu 4
+119 Rev.BD Menu1
+
+Bank 44 4 Varitation-44 [SC8850]
+38 TeeBee
+81 Cheese Saw 2
+117 SD Menu 5
+119 Rev.BD Menu2
+
+Bank 45 4 Varitation-45 [SC8850]
+81 Rhythmic Saw
+119 Rev.BD Menu3
+
+Bank 46 4 Varitation-46 [SC8850]
+81 SequencedSaw
+119 Rev.ClapMenu
+
+Bank 47 4 Varitation-47 [SC8850]
+81 Techno Saw
+
+Bank 48 4 Varitation-48 [SC8850]
+16 5th Organ
+
+Bank 64 4 User-Instruments-1 [SC8850]
+0 User Inst 001
+1 User Inst 002
+2 User Inst 003
+3 User Inst 004
+4 User Inst 005
+5 User Inst 006
+6 User Inst 007
+7 User Inst 008
+8 User Inst 009
+9 User Inst 010
+10 User Inst 011
+11 User Inst 012
+12 User Inst 013
+13 User Inst 014
+14 User Inst 015
+15 User Inst 016
+16 User Inst 017
+17 User Inst 018
+18 User Inst 019
+19 User Inst 020
+20 User Inst 021
+21 User Inst 022
+22 User Inst 023
+23 User Inst 024
+24 User Inst 025
+25 User Inst 026
+26 User Inst 027
+27 User Inst 028
+28 User Inst 029
+29 User Inst 030
+30 User Inst 031
+31 User Inst 032
+32 User Inst 033
+33 User Inst 034
+34 User Inst 035
+35 User Inst 036
+36 User Inst 037
+37 User Inst 038
+38 User Inst 039
+39 User Inst 040
+40 User Inst 041
+41 User Inst 042
+42 User Inst 043
+43 User Inst 044
+44 User Inst 045
+45 User Inst 046
+46 User Inst 047
+47 User Inst 048
+48 User Inst 049
+49 User Inst 050
+50 User Inst 051
+51 User Inst 052
+52 User Inst 053
+53 User Inst 054
+54 User Inst 055
+55 User Inst 056
+56 User Inst 057
+57 User Inst 058
+58 User Inst 059
+59 User Inst 060
+60 User Inst 061
+61 User Inst 062
+62 User Inst 063
+63 User Inst 064
+64 User Inst 065
+65 User Inst 066
+66 User Inst 067
+67 User Inst 068
+68 User Inst 069
+69 User Inst 070
+70 User Inst 071
+71 User Inst 072
+72 User Inst 073
+73 User Inst 074
+74 User Inst 075
+75 User Inst 076
+76 User Inst 077
+77 User Inst 078
+78 User Inst 079
+79 User Inst 080
+80 User Inst 081
+81 User Inst 082
+82 User Inst 083
+83 User Inst 084
+84 User Inst 085
+85 User Inst 086
+86 User Inst 087
+87 User Inst 088
+88 User Inst 089
+89 User Inst 090
+90 User Inst 091
+91 User Inst 092
+92 User Inst 093
+93 User Inst 094
+94 User Inst 095
+95 User Inst 096
+96 User Inst 097
+97 User Inst 098
+98 User Inst 099
+99 User Inst 100
+100 User Inst 101
+101 User Inst 102
+102 User Inst 103
+103 User Inst 104
+104 User Inst 105
+105 User Inst 106
+106 User Inst 107
+107 User Inst 108
+108 User Inst 109
+109 User Inst 110
+110 User Inst 111
+111 User Inst 112
+112 User Inst 113
+113 User Inst 114
+114 User Inst 115
+115 User Inst 116
+116 User Inst 117
+117 User Inst 118
+118 User Inst 119
+119 User Inst 120
+120 User Inst 121
+121 User Inst 122
+122 User Inst 123
+123 User Inst 124
+124 User Inst 125
+125 User Inst 126
+126 User Inst 127
+127 User Inst 128
+
+Bank 65 4 User-Instruments-2 [SC8850]
+0 User Inst 129
+1 User Inst 130
+2 User Inst 131
+3 User Inst 132
+4 User Inst 133
+5 User Inst 134
+6 User Inst 135
+7 User Inst 136
+8 User Inst 137
+9 User Inst 138
+10 User Inst 139
+11 User Inst 140
+12 User Inst 141
+13 User Inst 142
+14 User Inst 143
+15 User Inst 144
+16 User Inst 145
+17 User Inst 146
+18 User Inst 147
+19 User Inst 148
+20 User Inst 149
+21 User Inst 150
+22 User Inst 151
+23 User Inst 152
+24 User Inst 153
+25 User Inst 154
+26 User Inst 155
+27 User Inst 156
+28 User Inst 157
+29 User Inst 158
+30 User Inst 159
+31 User Inst 160
+32 User Inst 161
+33 User Inst 162
+34 User Inst 163
+35 User Inst 164
+36 User Inst 165
+37 User Inst 166
+38 User Inst 167
+39 User Inst 168
+40 User Inst 169
+41 User Inst 170
+42 User Inst 171
+43 User Inst 172
+44 User Inst 173
+45 User Inst 174
+46 User Inst 175
+47 User Inst 176
+48 User Inst 177
+49 User Inst 178
+50 User Inst 179
+51 User Inst 180
+52 User Inst 181
+53 User Inst 182
+54 User Inst 183
+55 User Inst 184
+56 User Inst 185
+57 User Inst 186
+58 User Inst 187
+59 User Inst 188
+60 User Inst 189
+61 User Inst 190
+62 User Inst 191
+63 User Inst 192
+64 User Inst 193
+65 User Inst 194
+66 User Inst 195
+67 User Inst 196
+68 User Inst 197
+69 User Inst 198
+70 User Inst 199
+71 User Inst 200
+72 User Inst 201
+73 User Inst 202
+74 User Inst 203
+75 User Inst 204
+76 User Inst 205
+77 User Inst 206
+78 User Inst 207
+79 User Inst 208
+80 User Inst 209
+81 User Inst 210
+82 User Inst 211
+83 User Inst 212
+84 User Inst 213
+85 User Inst 214
+86 User Inst 215
+87 User Inst 216
+88 User Inst 217
+89 User Inst 218
+90 User Inst 219
+91 User Inst 220
+92 User Inst 221
+93 User Inst 222
+94 User Inst 223
+95 User Inst 224
+96 User Inst 225
+97 User Inst 226
+98 User Inst 227
+99 User Inst 228
+100 User Inst 229
+101 User Inst 230
+102 User Inst 231
+103 User Inst 232
+104 User Inst 233
+105 User Inst 234
+106 User Inst 235
+107 User Inst 236
+108 User Inst 237
+109 User Inst 238
+110 User Inst 239
+111 User Inst 240
+112 User Inst 241
+113 User Inst 242
+114 User Inst 243
+115 User Inst 244
+116 User Inst 245
+117 User Inst 246
+118 User Inst 247
+119 User Inst 248
+120 User Inst 249
+121 User Inst 250
+122 User Inst 251
+123 User Inst 252
+124 User Inst 253
+125 User Inst 254
+126 User Inst 255
+127 User Inst 256
