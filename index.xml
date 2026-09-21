@@ -8,15 +8,62 @@
        resolve exactly as they do in a checkout. -->
   <category name=".">
     <reapack name="PAGER" type="script" desc="Roland GS editor suite for REAPER">
-      <version name="0.2.1" author="PurpBatBoi" time="2026-09-19T12:00:00Z">
-        <changelog><![CDATA[PAGER launcher: one action opens the suite.
-- The launcher is now the only action; the tools are internal files.
-- Effects Editor previews on the hardware as you edit and writes to the
-  MIDI take only when an Insert button asks for it.
-- Shared font and theme across every PAGER window.
-- Tool values are restored for the rest of the REAPER session, separately
-  per project tab.
-- Installs into Scripts/PAGER/ rather than Scripts/PAGER/PAGER/.]]></changelog>
+      <!-- The About tab. ReaPack renders this as RTF, not as plain text or
+           Markdown: without the \rtf1 header it reports "does not provide any
+           documentation" and shows nothing. \par ends a paragraph, \b and \b0
+           turn bold on and off, and \line breaks a line within a paragraph. -->
+      <description><![CDATA[{\rtf1\ansi\deff0
+{\fonttbl{\f0 Segoe UI;}}
+\fs20
+{\b PAGER}\line
+A suite of Roland GS editors for REAPER, aimed at the SC-8850 and its
+relatives.\par
+
+One action opens a launcher, and the launcher opens one tool at a time. Every
+tool previews on the hardware as you edit and writes MIDI events only when you
+ask it to, so auditioning a value and committing it stay separate.\par
+
+{\b Part Editor}\line
+Edits one Part at a time, chosen by the active MIDI editor's piano-roll
+channel, with the port group taken from the track's hardware output. Level,
+pan and the sends; cutoff and resonance; the envelope and vibrato rows;
+tuning offset, fine tune, pitch key and bend range; EQ and portamento.\par
+
+Values can be written as native CC and RPN or as Roland SysEx, switchable per
+channel. Insert writes the last parameter you touched at the edit cursor,
+replacing its previous value rather than stacking a second one, and labels it
+in the take so the item says what it holds.\par
+
+{\b Effects Editor}\line
+Master controls, the EQ and insertion-effect blocks, the reverb, chorus and
+delay parameters, and the per-Part EFX and EQ assignments. Presets can be
+saved and recalled, and an Insert can write a complete state or only the
+parameters you changed.\par
+
+{\b MIDI Export}\line
+Writes the active take out as a standard MIDI file.\par
+
+Values are remembered for the rest of the REAPER session, separately per
+project tab, and are never written into the project file.\par
+
+Requires ReaImGui. MIDI Export additionally requires MIDIUtils.\par
+}]]></description>
+      <version name="0.3.0" author="PurpBatBoi" time="2026-09-20T00:00:00Z">
+        <changelog><![CDATA[Part Editor.
+- Edits one SC-8850 Part, selected by the MIDI editor's piano-roll channel;
+  the track's hardware output selects the port group.
+- Sends and mix, filter, envelope, tuning, vibrato, and the switch and
+  performance controls, in two columns.
+- Native CC/RPN or Roland SysEx encoding, switchable per channel. EQ, Pitch
+  Key and Tuning Offset always use SysEx, having no CC form; Portamento
+  always uses CC, having no musical-state SysEx field.
+- A settled edit previews on the hardware and becomes that channel's one
+  pending value; Insert writes it at the edit cursor and sends nothing.
+- Insert replaces the parameter's previous representation rather than
+  stacking a second one, across a change of encoding, and writes a readable
+  text event beside it.
+- Control values and the SysEx setting are kept per channel and per project
+  tab.]]></changelog>
         <!-- The launcher is the only main action. Everything below is an
              internal file it loads, so the action list stays clean. -->
         <source main="main" file="editor/pager.lua">https://github.com/PurpBatBoi/PAGER/raw/refs/heads/main/editor/pager.lua</source>
